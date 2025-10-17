@@ -16,8 +16,8 @@ fn main() -> io::Result<()> {
     terminal.clear()?;
 
     let config = config::load_config();
-    let series = storage::load_series();
-    let mut app = App::new(series, config);
+    let entry = storage::load_entry();
+    let mut app = App::new(entry, config);
 
     loop {
         terminal.draw(|f| ui::draw_ui(f, &mut app))?;
@@ -27,7 +27,7 @@ fn main() -> io::Result<()> {
         }
     }
 
-    storage::save_series(&app.series);
+    storage::save_entry(&app.entry);
 
     stdout().execute(LeaveAlternateScreen)?;
     stdout().execute(DisableMouseCapture)?;

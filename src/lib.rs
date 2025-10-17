@@ -36,7 +36,7 @@ impl ToString for Status {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Series {
+pub struct Entry {
     pub title: String,
     pub season: u32,
     pub episode: u32,

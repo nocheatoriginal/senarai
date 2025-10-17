@@ -23,11 +23,11 @@ fn handle_key(key: KeyEvent, app: &mut App) -> io::Result<bool> {
     match app.input_mode {
         InputMode::Normal => match key.code {
             KeyCode::Char('q') => return Ok(true),
-            KeyCode::Up => app.prev_series(),
-            KeyCode::Down => app.next_series(),
+            KeyCode::Up => app.prev_entry(),
+            KeyCode::Down => app.next_entry(),
             KeyCode::Right => {
                 if key.modifiers == KeyModifiers::SHIFT {
-                    if let Some(s) = app.series.get(app.selected_index) {
+                    if let Some(s) = app.entry.get(app.selected_index) {
                         let new_status = s.status.next();
                         app.move_to(new_status);
                     }
@@ -37,7 +37,7 @@ fn handle_key(key: KeyEvent, app: &mut App) -> io::Result<bool> {
             }
             KeyCode::Left => {
                 if key.modifiers == KeyModifiers::SHIFT {
-                    if let Some(s) = app.series.get(app.selected_index) {
+                    if let Some(s) = app.entry.get(app.selected_index) {
                         let new_status = s.status.prev();
                         app.move_to(new_status);
                     }
@@ -60,12 +60,15 @@ fn handle_key(key: KeyEvent, app: &mut App) -> io::Result<bool> {
             KeyCode::Char('#') => {
                 app.next_season();
             }
+            KeyCode::Char('x') => {
+                app.remove_entry();
+            }
             _ => {}
         },
         InputMode::Editing => match key.code {
             KeyCode::Enter => {
-                let new_series: String = app.input.drain(..).collect();
-                app.add_series(new_series);
+                let new_entry: String = app.input.drain(..).collect();
+                app.add_entry(new_entry);
                 app.input_mode = InputMode::Normal;
             }
             KeyCode::Char(c) => {
@@ -103,17 +106,17 @@ fn handle_mouse(mouse: MouseEvent, app: &mut App) {
                     };
 
                     if let Some(status) = status {
-                        let series_in_status: Vec<_> = app
-                            .series
+                        let entry_in_status: Vec<_> = app
+                            .entry
                             .iter()
                             .enumerate()
                             .filter(|(_, s)| s.status == status)
                             .collect();
 
                         if let Some(item_index) = (mouse.row as usize).checked_sub(app.column_layout[col].y as usize + 1) {
-                            if let Some((idx, _)) = series_in_status.get(item_index) {
+                            if let Some((idx, _)) = entry_in_status.get(item_index) {
                                 app.selected_index = *idx;
-                                app.dragged_series = Some((*idx, app.series[*idx].status.clone()));
+                                app.dragged_entry = Some((*idx, app.entry[*idx].status.clone()));
                             }
                         }
                     }
@@ -121,7 +124,7 @@ fn handle_mouse(mouse: MouseEvent, app: &mut App) {
             }
         }
         MouseEventKind::Up(_) => {
-            if let Some((dragged_idx, _)) = app.dragged_series {
+            if let Some((dragged_idx, _)) = app.dragged_entry {
                 if !app.column_layout.is_empty() {
                     let col = app.column_layout.iter().position(|&r| mouse.column >= r.x && mouse.column < r.x + r.width);
 
@@ -134,11 +137,11 @@ fn handle_mouse(mouse: MouseEvent, app: &mut App) {
                         };
 
                         if let Some(new_status) = new_status {
-                            app.series[dragged_idx].status = new_status;
+                            app.entry[dragged_idx].status = new_status;
                         }
                     }
                 }
-                app.dragged_series = None;
+                app.dragged_entry = None;
             }
         }
         _ => {}

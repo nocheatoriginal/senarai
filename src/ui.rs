@@ -26,7 +26,7 @@ pub fn draw_ui(f: &mut Frame, app: &mut App) {
     draw_footer(f, chunks[chunks.len() - 1]);
 
     if app.show_help {
-        draw_help(f, &app.config.data_dir);
+        draw_help(f, &app.config.storage_path);
     }
 }
 
@@ -46,14 +46,14 @@ fn draw_main(f: &mut Frame, area: Rect, app: &mut App) {
         .iter()
         .enumerate()
     {
-        let series_in_status: Vec<(usize, &crate::Series)> = app
-            .series
+        let entry_in_status: Vec<(usize, &crate::Entry)> = app
+            .entry
             .iter()
             .enumerate()
             .filter(|(_, s)| &s.status == status)
             .collect();
 
-        let items: Vec<ListItem> = series_in_status
+        let items: Vec<ListItem> = entry_in_status
             .iter()
             .map(|(_, s)| {
                 let col_width = chunks[i].width as usize;
@@ -95,7 +95,7 @@ fn draw_main(f: &mut Frame, area: Rect, app: &mut App) {
             );
 
         let mut state = ListState::default();
-        if let Some(selected_in_status) = series_in_status
+        if let Some(selected_in_status) = entry_in_status
             .iter()
             .position(|(idx, _)| *idx == app.selected_index)
         {
@@ -112,7 +112,7 @@ fn draw_input(f: &mut Frame, area: Rect, app: &mut App) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("New Series")
+                .title("New Entry")
                 .border_style(Style::default().fg(Color::Blue))
                 .title_style(Style::default().fg(Color::LightYellow)),
         );
@@ -128,7 +128,7 @@ fn draw_footer(f: &mut Frame, area: Rect) {
     f.render_widget(paragraph, area);
 }
 
-fn draw_help(f: &mut Frame, data_dir: &str) {
+fn draw_help(f: &mut Frame, storage_path: &str) {
     let block = Block::default()
         .title("Help")
         .borders(Borders::ALL)
@@ -136,23 +136,21 @@ fn draw_help(f: &mut Frame, data_dir: &str) {
         .title_style(Style::default().fg(Color::LightYellow));
     let text = format!(
         "
-        q: quit
-        a: add new series
-        h: toggle help
+        a: add new entry                    (esc: abort)
 
-        ↑/↓: select series
-        ←/→: select column
-        Shift+←/→: move series to other column
+        ↑/↓: select row                     ←/→: select column
+        Shift + ←/→: move entry
 
-        +: increase episode
-        -: decrease episode
-        #: increase season
+        +: increase episode                 -: decrease episode
+        #: increase season                  x: remove entry
 
         mouse: drag & drop
 
+        h: toggle help                      q: quit        
+
         (Storage: {})
         ",
-        data_dir
+        storage_path
     );
     let paragraph = Paragraph::new(text)
         .style(Style::default().fg(Color::Blue))

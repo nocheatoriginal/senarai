@@ -5,15 +5,15 @@ const CONFIG_FILE_PATH: &str = "config.yaml";
 
 #[derive(Deserialize)]
 pub struct Config {
-    pub data_dir: String,
-    pub data_file: String,
+    pub storage_path: String,
+    pub storage_file: String,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            data_dir: ".".to_string(),
-            data_file: "wlt_data.json".to_string(),
+            storage_path: ".".to_string(),
+            storage_file: "watchlist.json".to_string(),
         }
     }
 }
