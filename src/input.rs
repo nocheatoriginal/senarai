@@ -46,6 +46,7 @@ fn handle_key(key: KeyEvent, app: &mut App) -> io::Result<bool> {
                 }
             }
             KeyCode::Char('a') => {
+                app.input.clear();
                 app.input_mode = InputMode::Adding;
             }
             KeyCode::Char('e') => {
