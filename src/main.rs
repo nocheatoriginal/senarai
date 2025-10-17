@@ -8,7 +8,6 @@ use std::io::{self, stdout};
 use wlt::{app::App, input, storage, ui};
 
 fn main() -> io::Result<()> {
-    // Setup terminal
     stdout().execute(EnterAlternateScreen)?;
     stdout().execute(EnableMouseCapture)?;
     enable_raw_mode()?;
@@ -16,11 +15,9 @@ fn main() -> io::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
     terminal.clear()?;
 
-    // Load data and create app
     let series = storage::load_series();
     let mut app = App::new(series);
 
-    // Main loop
     loop {
         terminal.draw(|f| ui::draw_ui(f, &mut app))?;
 
@@ -29,10 +26,8 @@ fn main() -> io::Result<()> {
         }
     }
 
-    // Save data
     storage::save_series(&app.series);
 
-    // Restore terminal
     stdout().execute(LeaveAlternateScreen)?;
     stdout().execute(DisableMouseCapture)?;
     disable_raw_mode()?;

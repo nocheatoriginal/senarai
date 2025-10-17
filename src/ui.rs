@@ -56,8 +56,19 @@ fn draw_main(f: &mut Frame, area: Rect, app: &mut App) {
         let items: Vec<ListItem> = series_in_status
             .iter()
             .map(|(_, s)| {
-                let title = if s.title.chars().count() > 20 {
-                    let mut truncated_title = s.title.chars().take(20).collect::<String>();
+                let col_width = chunks[i].width as usize;
+                let suffix = format!(" (S{} E{})", s.season, s.episode);
+                let suffix_len = suffix.chars().count();
+                let padding = 2usize;
+                let max_title_chars = if col_width > suffix_len + padding {
+                    col_width - suffix_len - padding
+                } else {
+                    0
+                };
+
+                let title = if s.title.chars().count() > max_title_chars {
+                    let take = max_title_chars.saturating_sub(3);
+                    let mut truncated_title = s.title.chars().take(take).collect::<String>();
                     truncated_title.push_str("...");
                     truncated_title
                 } else {
