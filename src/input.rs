@@ -46,10 +46,19 @@ fn handle_key(key: KeyEvent, app: &mut App) -> io::Result<bool> {
                 }
             }
             KeyCode::Char('a') => {
-                app.input_mode = InputMode::Editing;
+                app.input_mode = InputMode::Adding;
+            }
+            KeyCode::Char('e') => {
+                if let Some(s) = app.entry.get(app.selected_index) {
+                    app.input = s.title.clone();
+                    app.input_mode = InputMode::Editing;
+                }
             }
             KeyCode::Char('h') => {
                 app.show_help = !app.show_help;
+            }
+            KeyCode::Char('t') => {
+                app.show_full_title = !app.show_full_title;
             }
             KeyCode::Char('+') => {
                 app.next_episode();
@@ -65,10 +74,28 @@ fn handle_key(key: KeyEvent, app: &mut App) -> io::Result<bool> {
             }
             _ => {}
         },
-        InputMode::Editing => match key.code {
+        InputMode::Adding => match key.code {
             KeyCode::Enter => {
                 let new_entry: String = app.input.drain(..).collect();
                 app.add_entry(new_entry);
+                app.input_mode = InputMode::Normal;
+            }
+            KeyCode::Char(c) => {
+                app.input.push(c);
+            }
+            KeyCode::Backspace => {
+                app.input.pop();
+            }
+            KeyCode::Esc => {
+                app.input_mode = InputMode::Normal;
+            }
+            _ => {}
+        },
+        InputMode::Editing => match key.code {
+            KeyCode::Enter => {
+                if let Some(s) = app.entry.get_mut(app.selected_index) {
+                    s.title = app.input.drain(..).collect();
+                }
                 app.input_mode = InputMode::Normal;
             }
             KeyCode::Char(c) => {

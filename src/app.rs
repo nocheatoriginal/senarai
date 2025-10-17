@@ -4,6 +4,7 @@ use ratatui::layout::Rect;
 pub enum InputMode {
     Normal,
     Editing,
+    Adding,
 }
 
 pub struct App {
@@ -16,6 +17,7 @@ pub struct App {
     pub input: String,
     pub input_mode: InputMode,
     pub show_help: bool,
+    pub show_full_title: bool,
     pub config: Config,
 }
 
@@ -31,6 +33,7 @@ impl App {
             input: String::new(),
             input_mode: InputMode::Normal,
             show_help: false,
+            show_full_title: false,
             config,
         }
     }
