@@ -26,7 +26,7 @@ pub fn draw_ui(f: &mut Frame, app: &mut App) {
     draw_footer(f, chunks[chunks.len() - 1]);
 
     if app.show_help {
-        draw_help(f);
+        draw_help(f, &app.config.data_dir);
     }
 }
 
@@ -128,27 +128,32 @@ fn draw_footer(f: &mut Frame, area: Rect) {
     f.render_widget(paragraph, area);
 }
 
-fn draw_help(f: &mut Frame) {
+fn draw_help(f: &mut Frame, data_dir: &str) {
     let block = Block::default()
         .title("Help")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Blue))
         .title_style(Style::default().fg(Color::LightYellow));
-    let text = "
-    q: quit
-    a: add new series
-    h: toggle help
-    
-    ↑/↓: select series
-    ←/→: select column
-    Shift+←/→: move series to other column
-    
-    +: increase episode
-    -: decrease episode
-    #: increase season
-    
-    mouse: drag & drop
-    ";
+    let text = format!(
+        "
+        q: quit
+        a: add new series
+        h: toggle help
+
+        ↑/↓: select series
+        ←/→: select column
+        Shift+←/→: move series to other column
+
+        +: increase episode
+        -: decrease episode
+        #: increase season
+
+        mouse: drag & drop
+
+        (Storage: {})
+        ",
+        data_dir
+    );
     let paragraph = Paragraph::new(text)
         .style(Style::default().fg(Color::Blue))
         .block(block);

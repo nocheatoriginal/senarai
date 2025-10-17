@@ -5,7 +5,7 @@ use crossterm::{
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io::{self, stdout};
-use wlt::{app::App, input, storage, ui};
+use wlt::{app::App, config, input, storage, ui};
 
 fn main() -> io::Result<()> {
     stdout().execute(EnterAlternateScreen)?;
@@ -15,8 +15,9 @@ fn main() -> io::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
     terminal.clear()?;
 
+    let config = config::load_config();
     let series = storage::load_series();
-    let mut app = App::new(series);
+    let mut app = App::new(series, config);
 
     loop {
         terminal.draw(|f| ui::draw_ui(f, &mut app))?;

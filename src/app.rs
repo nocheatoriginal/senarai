@@ -1,4 +1,4 @@
-use crate::{Series, Status};
+use crate::{config::Config, Series, Status};
 use ratatui::layout::Rect;
 
 pub enum InputMode {
@@ -16,10 +16,11 @@ pub struct App {
     pub input: String,
     pub input_mode: InputMode,
     pub show_help: bool,
+    pub config: Config,
 }
 
 impl App {
-    pub fn new(series: Vec<Series>) -> Self {
+    pub fn new(series: Vec<Series>, config: Config) -> Self {
         Self {
             series,
             selected_index: 0,
@@ -30,6 +31,7 @@ impl App {
             input: String::new(),
             input_mode: InputMode::Normal,
             show_help: false,
+            config,
         }
     }
 
