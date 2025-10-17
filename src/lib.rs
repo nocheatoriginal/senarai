@@ -44,6 +44,7 @@ pub struct Series {
 }
 
 pub mod app;
+pub mod config;
 pub mod input;
 pub mod storage;
 pub mod ui;
