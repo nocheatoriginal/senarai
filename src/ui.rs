@@ -128,7 +128,16 @@ fn draw_input(f: &mut Frame, area: Rect, app: &mut App) {
 }
 
 fn draw_footer(f: &mut Frame, area: Rect) {
-    let text = "q: quit | a: add | e: edit | h: help | ↑/↓: select | ←/→: navigate | +/-: episode | #: season";
+    let text = "q: quit | a: add | e: edit | h: help | ↑/↓: select | ←/→: navigate";
+    let text_width = text.len() as u16;
+    let text = if text_width > area.width {
+        let mut truncated_text = text.chars().take(area.width as usize - 3).collect::<String>();
+        truncated_text.push_str("...");
+        truncated_text
+    } else {
+        text.to_string()
+    };
+
     let paragraph = Paragraph::new(text)
         .style(Style::default().fg(Color::DarkGray))
         .alignment(Alignment::Center);
@@ -136,35 +145,88 @@ fn draw_footer(f: &mut Frame, area: Rect) {
 }
 
 fn draw_help(f: &mut Frame, storage_path: &str) {
+    let area = centered_rect(80, 50, f.size());
     let block = Block::default()
         .title("Help")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Blue))
-        .title_style(Style::default().fg(Color::LightYellow));
-    let text = format!(
-        "
-        a: add new entry                    (esc: abort)
+        .title_style(Style::default().fg(Color::LightYellow))
+        .padding(Padding::new(2, 2, 1, 1));
 
-        ↑/↓: select row                     ←/→: select column
-        Shift + ←/→: move entry
-
-        +: increase episode                 -: decrease episode
-        #: increase season                  x: remove entry
-
-        mouse: drag & drop
-
-        h: toggle help                      q: quit        
-
-        (Storage: {})
-        ",
-        storage_path
-    );
-    let paragraph = Paragraph::new(text)
-        .style(Style::default().fg(Color::Blue))
-        .block(block);
-    let area = centered_rect(60, 50, f.size());
     f.render_widget(Clear, area);
-    f.render_widget(paragraph, area);
+    f.render_widget(block.clone(), area);
+
+    let is_small = area.width < 60;
+
+    let chunks = Layout::default()
+        .margin(1)
+        .direction(Direction::Vertical)
+        .constraints(
+            [
+                Constraint::Min(0),
+                Constraint::Length(1),
+            ]
+            .as_ref(),
+        )
+        .split(block.inner(area));
+
+    if is_small {
+        let help_text = format!("{}\n{}", get_help_text_left(), get_help_text_right());
+        let help_p = Paragraph::new(help_text)
+            .style(Style::default().fg(Color::Blue))
+            .wrap(Wrap { trim: true });
+        f.render_widget(help_p, chunks[0]);
+    } else {
+        let help_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+            .split(chunks[0]);
+
+        let left_p = Paragraph::new(get_help_text_left())
+            .style(Style::default().fg(Color::Blue))
+            .wrap(Wrap { trim: true });
+        let right_p = Paragraph::new(get_help_text_right())
+            .style(Style::default().fg(Color::Blue))
+            .wrap(Wrap { trim: true });
+        f.render_widget(left_p, help_chunks[0]);
+        f.render_widget(right_p, help_chunks[1]);
+    }
+
+    let storage_p = Paragraph::new(format!("Storage: {}", storage_path))
+        .style(Style::default().fg(Color::Blue))
+        .alignment(Alignment::Center);
+
+    f.render_widget(storage_p, chunks[1]);
+}
+
+fn get_help_text_left() -> String {
+    "a: add new entry
+    e: edit entry
+
+    +: increase episode
+    -: decrease episode
+
+    ↑/↓: select row
+    Shift + ←/→: move entry
+
+    h: toggle help
+    "
+    .to_string()
+}
+
+fn get_help_text_right() -> String {
+    "(esc: abort)
+
+
+    #: increase season
+    x: remove entry
+
+    ←/→: select column
+    mouse: drag & drop
+
+    q: quit
+    "
+    .to_string()
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
