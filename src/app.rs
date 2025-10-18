@@ -61,11 +61,11 @@ impl App {
 
     pub fn prev_episode(&mut self) {
         if let Some(s) = self.entry.get_mut(self.selected_index) {
-            if s.episode > 1 {
+            if s.episode > 0 {
                 s.episode -= 1;
             } else if s.season > 1 {
                 s.season -= 1;
-                s.episode = 1;
+                s.episode = 0;
             }
         }
     }
@@ -73,7 +73,7 @@ impl App {
     pub fn next_season(&mut self) {
         if let Some(s) = self.entry.get_mut(self.selected_index) {
             s.season += 1;
-            s.episode = 1;
+            s.episode = 0;
         }
     }
 
