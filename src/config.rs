@@ -1,9 +1,11 @@
 use serde::Deserialize;
+use std::env;
 use std::fs;
+use std::path::PathBuf;
 
-const CONFIG_FILE_PATH: &str = "config.yaml";
+const CONFIG_FILE_NAME: &str = "config.yaml";
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct Config {
     pub storage_path: String,
     pub storage_file: String,
@@ -11,16 +13,26 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
+        let storage_path = env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+            .unwrap_or_else(|| PathBuf::from("."));
+
         Self {
-            storage_path: ".".to_string(),
+            storage_path: storage_path.to_str().unwrap_or(".").to_string(),
             storage_file: "watchlist.json".to_string(),
         }
     }
 }
 
 pub fn load_config() -> Config {
-    if let Ok(data) = fs::read_to_string(CONFIG_FILE_PATH) {
-        serde_yaml::from_str(&data).unwrap_or_default()
+    let config_path = env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.join(CONFIG_FILE_NAME)))
+        .unwrap_or_else(|| PathBuf::from(CONFIG_FILE_NAME));
+
+    if let Ok(data) = fs::read_to_string(config_path) {
+        serde_yaml::from_str(&data).unwrap_or_else(|_| Config::default())
     } else {
         Config::default()
     }
