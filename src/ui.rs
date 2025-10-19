@@ -207,7 +207,7 @@ fn get_help_text_left() -> String {
     -: decrease episode
 
     ↑/↓: select row
-    Shift + ←/→: move entry
+    Shift + navigation: move entry
 
     h: toggle help
     "
