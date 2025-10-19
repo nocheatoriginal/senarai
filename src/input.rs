@@ -23,8 +23,28 @@ fn handle_key(key: KeyEvent, app: &mut App) -> io::Result<bool> {
     match app.input_mode {
         InputMode::Normal => match key.code {
             KeyCode::Char('q') => return Ok(true),
-            KeyCode::Up => app.prev_entry(),
-            KeyCode::Down => app.next_entry(),
+            KeyCode::Up => {
+                if key.modifiers == KeyModifiers::SHIFT {
+                    if app.selected_index > 0 {
+                        let current_entry = app.entry.remove(app.selected_index);
+                        app.entry.insert(app.selected_index - 1, current_entry);
+                        app.selected_index -= 1;
+                    }
+                } else {
+                    app.prev_entry();
+                }
+            }
+            KeyCode::Down => {
+                if key.modifiers == KeyModifiers::SHIFT {
+                    if app.selected_index < app.entry.len() - 1 {
+                        let current_entry = app.entry.remove(app.selected_index);
+                        app.entry.insert(app.selected_index + 1, current_entry);
+                        app.selected_index += 1;
+                    }
+                } else {
+                    app.next_entry();
+                }
+            }
             KeyCode::Right => {
                 if key.modifiers == KeyModifiers::SHIFT {
                     if let Some(s) = app.entry.get(app.selected_index) {
@@ -47,11 +67,13 @@ fn handle_key(key: KeyEvent, app: &mut App) -> io::Result<bool> {
             }
             KeyCode::Char('a') => {
                 app.input.clear();
+                app.cursor_position = 0;
                 app.input_mode = InputMode::Adding;
             }
             KeyCode::Char('e') => {
                 if let Some(s) = app.entry.get(app.selected_index) {
                     app.input = s.title.clone();
+                    app.cursor_position = app.input.len();
                     app.input_mode = InputMode::Editing;
                 }
             }
@@ -80,15 +102,32 @@ fn handle_key(key: KeyEvent, app: &mut App) -> io::Result<bool> {
                 let new_entry: String = app.input.drain(..).collect();
                 app.add_entry(new_entry);
                 app.input_mode = InputMode::Normal;
+                app.cursor_position = 0;
             }
             KeyCode::Char(c) => {
-                app.input.push(c);
+                app.input.insert(app.cursor_position, c);
+                app.cursor_position = clamp_cursor(app.cursor_position + 1, &app.input);
             }
             KeyCode::Backspace => {
-                app.input.pop();
+                if app.cursor_position > 0 {
+                    app.cursor_position -= 1;
+                    app.input.remove(app.cursor_position);
+                }
+            }
+            KeyCode::Delete => {
+                if app.cursor_position < app.input.len() {
+                    app.input.remove(app.cursor_position);
+                }
+            }
+            KeyCode::Left => {
+                app.cursor_position = clamp_cursor(app.cursor_position.saturating_sub(1), &app.input);
+            }
+            KeyCode::Right => {
+                app.cursor_position = clamp_cursor(app.cursor_position + 1, &app.input);
             }
             KeyCode::Esc => {
                 app.input_mode = InputMode::Normal;
+                app.cursor_position = 0;
             }
             _ => {}
         },
@@ -98,15 +137,32 @@ fn handle_key(key: KeyEvent, app: &mut App) -> io::Result<bool> {
                     s.title = app.input.drain(..).collect();
                 }
                 app.input_mode = InputMode::Normal;
+                app.cursor_position = 0;
             }
             KeyCode::Char(c) => {
-                app.input.push(c);
+                app.input.insert(app.cursor_position, c);
+                app.cursor_position = clamp_cursor(app.cursor_position + 1, &app.input);
             }
             KeyCode::Backspace => {
-                app.input.pop();
+                if app.cursor_position > 0 {
+                    app.cursor_position -= 1;
+                    app.input.remove(app.cursor_position);
+                }
+            }
+            KeyCode::Delete => {
+                if app.cursor_position < app.input.len() {
+                    app.input.remove(app.cursor_position);
+                }
+            }
+            KeyCode::Left => {
+                app.cursor_position = clamp_cursor(app.cursor_position.saturating_sub(1), &app.input);
+            }
+            KeyCode::Right => {
+                app.cursor_position = clamp_cursor(app.cursor_position + 1, &app.input);
             }
             KeyCode::Esc => {
                 app.input_mode = InputMode::Normal;
+                app.cursor_position = 0;
             }
             _ => {}
         },
@@ -114,11 +170,24 @@ fn handle_key(key: KeyEvent, app: &mut App) -> io::Result<bool> {
     Ok(false)
 }
 
+fn clamp_cursor(new_cursor_pos: usize, input: &str) -> usize {
+    new_cursor_pos.clamp(0, input.len())
+}
+
 fn handle_mouse(mouse: MouseEvent, app: &mut App) {
     app.mouse_pos = (mouse.column, mouse.row);
 
     match mouse.kind {
         MouseEventKind::Down(_) => {
+            if let InputMode::Adding | InputMode::Editing = app.input_mode {
+                // Check if the click is within the input area
+                if !app.layout.is_empty() && app.layout.len() > 1 && mouse.row == app.layout[1].y + 1 && mouse.column > app.layout[1].x && mouse.column < app.layout[1].x + app.layout[1].width - 1 {
+                    let new_cursor_pos = (mouse.column - (app.layout[1].x + 1)) as usize;
+                    app.cursor_position = clamp_cursor(new_cursor_pos, &app.input);
+                    return;
+                }
+            }
+
             if !app.column_layout.is_empty() {
                 let col = app.column_layout.iter().position(|&r|
                     mouse.column >= r.x && mouse.column < r.x + r.width &&

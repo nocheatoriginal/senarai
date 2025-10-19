@@ -124,7 +124,7 @@ fn draw_input(f: &mut Frame, area: Rect, app: &mut App) {
                 .title_style(Style::default().fg(Color::LightYellow)),
         );
     f.render_widget(input, area);
-    f.set_cursor(area.x + app.input.len() as u16 + 1, area.y + 1);
+    f.set_cursor(area.x + app.cursor_position as u16 + 1, area.y + 1);
 }
 
 fn draw_footer(f: &mut Frame, area: Rect) {
