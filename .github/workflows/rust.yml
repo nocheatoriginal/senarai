@@ -20,6 +20,7 @@ jobs:
 
   test:
     runs-on: alpine-latest
+    needs: build
 
     steps:
     - uses: actions/checkout@v4
