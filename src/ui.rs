@@ -1,4 +1,4 @@
-use crate::{app::App, app::InputMode, Status};
+use crate::{app::App, app::InputMode, consts, Status};
 use ratatui::{prelude::*, widgets::*};
 
 pub fn draw_ui(f: &mut Frame, app: &mut App) {
@@ -6,14 +6,12 @@ pub fn draw_ui(f: &mut Frame, app: &mut App) {
         .direction(Direction::Vertical)
         .constraints(match app.input_mode {
             InputMode::Normal => [Constraint::Min(0), Constraint::Length(1)].as_ref(),
-            InputMode::Adding | InputMode::Editing => {
-                [
-                    Constraint::Min(0),
-                    Constraint::Length(3),
-                    Constraint::Length(1),
-                ]
-                .as_ref()
-            }
+            InputMode::Adding | InputMode::Editing => [
+                Constraint::Min(0),
+                Constraint::Length(3),
+                Constraint::Length(1),
+            ]
+            .as_ref(),
         })
         .split(f.size());
 
@@ -37,9 +35,9 @@ fn draw_main(f: &mut Frame, area: Rect, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(33),
-            Constraint::Percentage(34),
-            Constraint::Percentage(33),
+            Constraint::Percentage(consts::COLUMN_1_WIDTH),
+            Constraint::Percentage(consts::COLUMN_2_WIDTH),
+            Constraint::Percentage(consts::COLUMN_3_WIDTH),
         ])
         .split(area);
 
@@ -62,9 +60,8 @@ fn draw_main(f: &mut Frame, area: Rect, app: &mut App) {
                 let col_width = chunks[i].width as usize;
                 let suffix = format!(" (S{} E{})", s.season, s.episode);
                 let suffix_len = suffix.chars().count();
-                let padding = 2usize;
-                let max_title_chars = if col_width > suffix_len + padding {
-                    col_width - suffix_len - padding
+                let max_title_chars = if col_width > suffix_len + consts::PADDING {
+                    col_width - suffix_len - consts::PADDING
                 } else {
                     0
                 };
@@ -78,7 +75,7 @@ fn draw_main(f: &mut Frame, area: Rect, app: &mut App) {
                     s.title.clone()
                 };
                 ListItem::new(format!("{} (S{} E{})", title, s.season, s.episode))
-                    .style(Style::default().fg(Color::Blue))
+                    .style(Style::default().fg(consts::TEXT_COLOR))
             })
             .collect();
 
@@ -87,14 +84,14 @@ fn draw_main(f: &mut Frame, area: Rect, app: &mut App) {
                 Block::default()
                     .title(status.to_string())
                     .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::Blue))
-                    .title_style(Style::default().fg(Color::LightYellow)),
+                    .border_style(Style::default().fg(consts::BORDER_COLOR))
+                    .title_style(Style::default().fg(consts::TITLE_COLOR)),
             )
             .highlight_style(
                 Style::default()
                     .add_modifier(Modifier::BOLD)
-                    .bg(Color::Blue)
-                    .fg(Color::Gray),
+                    .bg(consts::HIGHLIGHT_BG)
+                    .fg(consts::HIGHLIGHT_FG),
             );
 
         let mut state = ListState::default();
@@ -116,13 +113,13 @@ fn draw_input(f: &mut Frame, area: Rect, app: &mut App) {
         _ => "",
     };
     let input = Paragraph::new(app.input.as_str())
-        .style(Style::default().fg(Color::Blue))
+        .style(Style::default().fg(consts::TEXT_COLOR))
         .block(
             Block::default()
                 .borders(Borders::ALL)
                 .title(title)
-                .border_style(Style::default().fg(Color::Blue))
-                .title_style(Style::default().fg(Color::LightYellow)),
+                .border_style(Style::default().fg(consts::BORDER_COLOR))
+                .title_style(Style::default().fg(consts::TITLE_COLOR)),
         );
     f.render_widget(input, area);
     f.set_cursor(area.x + app.cursor_position as u16 + 1, area.y + 1);
@@ -132,7 +129,10 @@ fn draw_footer(f: &mut Frame, area: Rect) {
     let text = "q: quit | a: add | e: edit | h: help | up/down: select | left/right: navigate";
     let text_width = text.len() as u16;
     let text = if text_width > area.width {
-        let mut truncated_text = text.chars().take(area.width as usize - 3).collect::<String>();
+        let mut truncated_text = text
+            .chars()
+            .take(area.width as usize - 3)
+            .collect::<String>();
         truncated_text.push_str("...");
         truncated_text
     } else {
@@ -140,18 +140,22 @@ fn draw_footer(f: &mut Frame, area: Rect) {
     };
 
     let paragraph = Paragraph::new(text)
-        .style(Style::default().fg(Color::DarkGray))
+        .style(Style::default().fg(consts::FOOTER_TEXT_COLOR))
         .alignment(Alignment::Center);
     f.render_widget(paragraph, area);
 }
 
 fn draw_help(f: &mut Frame, storage_path: &str) {
-    let area = centered_rect(80, 50, f.size());
+    let area = centered_rect(
+        consts::HELP_POPUP_WIDTH,
+        consts::HELP_POPUP_HEIGHT,
+        f.size(),
+    );
     let block = Block::default()
         .title("Help")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Blue))
-        .title_style(Style::default().fg(Color::LightYellow))
+        .border_style(Style::default().fg(consts::BORDER_COLOR))
+        .title_style(Style::default().fg(consts::TITLE_COLOR))
         .padding(Padding::new(2, 2, 1, 1));
 
     f.render_widget(Clear, area);
@@ -162,19 +166,13 @@ fn draw_help(f: &mut Frame, storage_path: &str) {
     let chunks = Layout::default()
         .margin(1)
         .direction(Direction::Vertical)
-        .constraints(
-            [
-                Constraint::Min(0),
-                Constraint::Length(1),
-            ]
-            .as_ref(),
-        )
+        .constraints([Constraint::Min(0), Constraint::Length(1)].as_ref())
         .split(block.inner(area));
 
     if is_small {
         let help_text = format!("{}\n{}", get_help_text_left(), get_help_text_right());
         let help_p = Paragraph::new(help_text)
-            .style(Style::default().fg(Color::Blue))
+            .style(Style::default().fg(consts::TEXT_COLOR))
             .wrap(Wrap { trim: true });
         f.render_widget(help_p, chunks[0]);
     } else {
@@ -184,17 +182,17 @@ fn draw_help(f: &mut Frame, storage_path: &str) {
             .split(chunks[0]);
 
         let left_p = Paragraph::new(get_help_text_left())
-            .style(Style::default().fg(Color::Blue))
+            .style(Style::default().fg(consts::TEXT_COLOR))
             .wrap(Wrap { trim: true });
         let right_p = Paragraph::new(get_help_text_right())
-            .style(Style::default().fg(Color::Blue))
+            .style(Style::default().fg(consts::TEXT_COLOR))
             .wrap(Wrap { trim: true });
         f.render_widget(left_p, help_chunks[0]);
         f.render_widget(right_p, help_chunks[1]);
     }
 
     let storage_p = Paragraph::new(format!("Storage: {}", storage_path))
-        .style(Style::default().fg(Color::Blue))
+        .style(Style::default().fg(consts::TEXT_COLOR))
         .alignment(Alignment::Center);
 
     f.render_widget(storage_p, chunks[1]);
@@ -269,9 +267,8 @@ fn draw_title_popup(f: &mut Frame, app: &App) {
         let col_width = app.column_layout[status_index].width as usize;
         let suffix = format!(" (S{} E{})", entry.season, entry.episode);
         let suffix_len = suffix.chars().count();
-        let padding = 2usize;
-        let max_title_chars = if col_width > suffix_len + padding {
-            col_width - suffix_len - padding
+        let max_title_chars = if col_width > suffix_len + consts::PADDING {
+            col_width - suffix_len - consts::PADDING
         } else {
             0
         };
@@ -280,13 +277,17 @@ fn draw_title_popup(f: &mut Frame, app: &App) {
             let block = Block::default()
                 .title("Full Title")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Blue))
-                .title_style(Style::default().fg(Color::LightYellow));
+                .border_style(Style::default().fg(consts::BORDER_COLOR))
+                .title_style(Style::default().fg(consts::TITLE_COLOR));
             let text = Paragraph::new(entry.title.as_str())
                 .block(block)
                 .wrap(Wrap { trim: true });
 
-            let area = centered_rect(60, 10, f.size());
+            let area = centered_rect(
+                consts::TITLE_POPUP_WIDTH,
+                consts::TITLE_POPUP_HEIGHT,
+                f.size(),
+            );
             f.render_widget(Clear, area);
             f.render_widget(text, area);
         }
@@ -295,7 +296,7 @@ fn draw_title_popup(f: &mut Frame, app: &App) {
 
 fn draw_error_popup(f: &mut Frame, app: &mut App) {
     if let Some(last_error_time) = app.last_error_time {
-        if last_error_time.elapsed().as_secs() > 3 {
+        if last_error_time.elapsed().as_secs() > consts::ERROR_POPUP_DURATION {
             app.error = None;
             app.last_error_time = None;
         } else if let Some(error) = &app.error {
@@ -314,8 +315,10 @@ fn draw_error_popup(f: &mut Frame, app: &mut App) {
             };
             let height = wrapped_lines + 2; // +2 for top/bottom borders
 
-            let y = if let (InputMode::Adding | InputMode::Editing, Some(input_chunk)) = (&app.input_mode, app.layout.get(1)) {
-                 input_chunk.y.saturating_sub(height)
+            let y = if let (InputMode::Adding | InputMode::Editing, Some(input_chunk)) =
+                (&app.input_mode, app.layout.get(1))
+            {
+                input_chunk.y.saturating_sub(height)
             } else {
                 f.size().height.saturating_sub(height)
             };
@@ -330,12 +333,12 @@ fn draw_error_popup(f: &mut Frame, app: &mut App) {
             let block = Block::default()
                 .title("Error")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Red))
-                .title_style(Style::default().fg(Color::LightYellow));
+                .border_style(Style::default().fg(consts::ERROR_BORDER_COLOR))
+                .title_style(Style::default().fg(consts::TITLE_COLOR));
             let text = Paragraph::new(error.as_str())
                 .block(block)
                 .wrap(Wrap { trim: true })
-                .style(Style::default().fg(Color::Red));
+                .style(Style::default().fg(consts::ERROR_TEXT_COLOR));
 
             f.render_widget(Clear, area);
             f.render_widget(text, area);

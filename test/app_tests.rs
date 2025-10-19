@@ -1,6 +1,6 @@
 use senarai::app::App;
-use senarai::{Entry, Status};
 use senarai::config::Config;
+use senarai::{Entry, Status};
 
 fn create_dummy_app() -> App {
     let entries = vec![

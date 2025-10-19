@@ -45,6 +45,7 @@ pub struct Entry {
 
 pub mod app;
 pub mod config;
+pub mod consts;
 pub mod input;
 pub mod storage;
 pub mod ui;

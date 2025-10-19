@@ -1,6 +1,7 @@
 use crate::{app::App, app::InputMode, Status};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 
+#[derive(PartialEq)]
 pub enum InputResult {
     Quit,
     Error(String),
@@ -29,153 +30,139 @@ pub fn handle_input(app: &mut App) -> InputResult {
 
 fn handle_key(key: KeyEvent, app: &mut App) -> InputResult {
     match app.input_mode {
-        InputMode::Normal => match key.code {
-            KeyCode::Char('q') => return InputResult::Quit,
-            KeyCode::Up => {
-                if key.modifiers == KeyModifiers::SHIFT {
-                    if app.selected_index > 0 {
-                        let current_entry = app.entry.remove(app.selected_index);
-                        app.entry.insert(app.selected_index - 1, current_entry);
-                        app.selected_index -= 1;
-                    }
-                } else {
-                    app.prev_entry();
+        InputMode::Normal => {
+            if handle_normal_mode_key(key, app) == InputResult::Quit {
+                return InputResult::Quit;
+            }
+        }
+        InputMode::Adding | InputMode::Editing => {
+            handle_input_mode_key(key, app);
+        }
+    }
+    InputResult::Success
+}
+
+fn handle_normal_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
+    match key.code {
+        KeyCode::Char('q') => return InputResult::Quit,
+        KeyCode::Up => {
+            if key.modifiers == KeyModifiers::SHIFT {
+                if app.selected_index > 0 {
+                    let current_entry = app.entry.remove(app.selected_index);
+                    app.entry.insert(app.selected_index - 1, current_entry);
+                    app.selected_index -= 1;
                 }
+            } else {
+                app.prev_entry();
             }
-            KeyCode::Down => {
-                if key.modifiers == KeyModifiers::SHIFT {
-                    if app.selected_index < app.entry.len() - 1 {
-                        let current_entry = app.entry.remove(app.selected_index);
-                        app.entry.insert(app.selected_index + 1, current_entry);
-                        app.selected_index += 1;
-                    }
-                } else {
-                    app.next_entry();
+        }
+        KeyCode::Down => {
+            if key.modifiers == KeyModifiers::SHIFT {
+                if app.selected_index < app.entry.len() - 1 {
+                    let current_entry = app.entry.remove(app.selected_index);
+                    app.entry.insert(app.selected_index + 1, current_entry);
+                    app.selected_index += 1;
                 }
+            } else {
+                app.next_entry();
             }
-            KeyCode::Right => {
-                if key.modifiers == KeyModifiers::SHIFT {
-                    if let Some(s) = app.entry.get(app.selected_index) {
-                        let new_status = s.status.next();
-                        app.move_to(new_status);
-                    }
-                } else {
-                    app.select_next_column();
-                }
-            }
-            KeyCode::Left => {
-                if key.modifiers == KeyModifiers::SHIFT {
-                    if let Some(s) = app.entry.get(app.selected_index) {
-                        let new_status = s.status.prev();
-                        app.move_to(new_status);
-                    }
-                } else {
-                    app.select_prev_column();
-                }
-            }
-            KeyCode::Char('a') => {
-                app.input.clear();
-                app.cursor_position = 0;
-                app.input_mode = InputMode::Adding;
-            }
-            KeyCode::Char('e') => {
+        }
+        KeyCode::Right => {
+            if key.modifiers == KeyModifiers::SHIFT {
                 if let Some(s) = app.entry.get(app.selected_index) {
-                    app.input = s.title.clone();
-                    app.cursor_position = app.input.len();
-                    app.input_mode = InputMode::Editing;
+                    let new_status = s.status.next();
+                    app.move_to(new_status);
                 }
+            } else {
+                app.select_next_column();
             }
-            KeyCode::Char('h') => {
-                app.show_help = !app.show_help;
+        }
+        KeyCode::Left => {
+            if key.modifiers == KeyModifiers::SHIFT {
+                if let Some(s) = app.entry.get(app.selected_index) {
+                    let new_status = s.status.prev();
+                    app.move_to(new_status);
+                }
+            } else {
+                app.select_prev_column();
             }
-            KeyCode::Char('t') => {
-                app.show_full_title = !app.show_full_title;
+        }
+        KeyCode::Char('a') => {
+            app.input.clear();
+            app.cursor_position = 0;
+            app.input_mode = InputMode::Adding;
+        }
+        KeyCode::Char('e') => {
+            if let Some(s) = app.entry.get(app.selected_index) {
+                app.input = s.title.clone();
+                app.cursor_position = app.input.len();
+                app.input_mode = InputMode::Editing;
             }
-            KeyCode::Char('+') => {
-                app.next_episode();
-            }
-            KeyCode::Char('-') => {
-                app.prev_episode();
-            }
-            KeyCode::Char('#') => {
-                app.next_season();
-            }
-            KeyCode::Char('x') => {
-                app.remove_entry();
-            }
-            _ => {}
-        },
-        InputMode::Adding => match key.code {
-            KeyCode::Enter => {
+        }
+        KeyCode::Char('h') => {
+            app.show_help = !app.show_help;
+        }
+        KeyCode::Char('t') => {
+            app.show_full_title = !app.show_full_title;
+        }
+        KeyCode::Char('+') => {
+            app.next_episode();
+        }
+        KeyCode::Char('-') => {
+            app.prev_episode();
+        }
+        KeyCode::Char('#') => {
+            app.next_season();
+        }
+        KeyCode::Char('x') => {
+            app.remove_entry();
+        }
+        _ => {}
+    }
+    InputResult::Success
+}
+
+fn handle_input_mode_key(key: KeyEvent, app: &mut App) {
+    match key.code {
+        KeyCode::Enter => {
+            if let InputMode::Adding = app.input_mode {
                 let new_entry: String = app.input.drain(..).collect();
                 app.add_entry(new_entry);
-                app.input_mode = InputMode::Normal;
-                app.cursor_position = 0;
-            }
-            KeyCode::Char(c) => {
-                app.input.insert(app.cursor_position, c);
-                app.cursor_position = clamp_cursor(app.cursor_position + 1, &app.input);
-            }
-            KeyCode::Backspace => {
-                if app.cursor_position > 0 {
-                    app.cursor_position -= 1;
-                    app.input.remove(app.cursor_position);
-                }
-            }
-            KeyCode::Delete => {
-                if app.cursor_position < app.input.len() {
-                    app.input.remove(app.cursor_position);
-                }
-            }
-            KeyCode::Left => {
-                app.cursor_position = clamp_cursor(app.cursor_position.saturating_sub(1), &app.input);
-            }
-            KeyCode::Right => {
-                app.cursor_position = clamp_cursor(app.cursor_position + 1, &app.input);
-            }
-            KeyCode::Esc => {
-                app.input_mode = InputMode::Normal;
-                app.cursor_position = 0;
-            }
-            _ => {}
-        },
-        InputMode::Editing => match key.code {
-            KeyCode::Enter => {
+            } else if let InputMode::Editing = app.input_mode {
                 if let Some(s) = app.entry.get_mut(app.selected_index) {
                     s.title = app.input.drain(..).collect();
                 }
-                app.input_mode = InputMode::Normal;
-                app.cursor_position = 0;
             }
-            KeyCode::Char(c) => {
-                app.input.insert(app.cursor_position, c);
-                app.cursor_position = clamp_cursor(app.cursor_position + 1, &app.input);
+            app.input_mode = InputMode::Normal;
+            app.cursor_position = 0;
+        }
+        KeyCode::Char(c) => {
+            app.input.insert(app.cursor_position, c);
+            app.cursor_position = clamp_cursor(app.cursor_position + 1, &app.input);
+        }
+        KeyCode::Backspace => {
+            if app.cursor_position > 0 {
+                app.cursor_position -= 1;
+                app.input.remove(app.cursor_position);
             }
-            KeyCode::Backspace => {
-                if app.cursor_position > 0 {
-                    app.cursor_position -= 1;
-                    app.input.remove(app.cursor_position);
-                }
+        }
+        KeyCode::Delete => {
+            if app.cursor_position < app.input.len() {
+                app.input.remove(app.cursor_position);
             }
-            KeyCode::Delete => {
-                if app.cursor_position < app.input.len() {
-                    app.input.remove(app.cursor_position);
-                }
-            }
-            KeyCode::Left => {
-                app.cursor_position = clamp_cursor(app.cursor_position.saturating_sub(1), &app.input);
-            }
-            KeyCode::Right => {
-                app.cursor_position = clamp_cursor(app.cursor_position + 1, &app.input);
-            }
-            KeyCode::Esc => {
-                app.input_mode = InputMode::Normal;
-                app.cursor_position = 0;
-            }
-            _ => {}
-        },
+        }
+        KeyCode::Left => {
+            app.cursor_position = clamp_cursor(app.cursor_position.saturating_sub(1), &app.input);
+        }
+        KeyCode::Right => {
+            app.cursor_position = clamp_cursor(app.cursor_position + 1, &app.input);
+        }
+        KeyCode::Esc => {
+            app.input_mode = InputMode::Normal;
+            app.cursor_position = 0;
+        }
+        _ => {}
     }
-    InputResult::Success
 }
 
 fn clamp_cursor(new_cursor_pos: usize, input: &str) -> usize {
@@ -189,7 +176,12 @@ fn handle_mouse(mouse: MouseEvent, app: &mut App) {
         MouseEventKind::Down(_) => {
             if let InputMode::Adding | InputMode::Editing = app.input_mode {
                 // Check if the click is within the input area
-                if !app.layout.is_empty() && app.layout.len() > 1 && mouse.row == app.layout[1].y + 1 && mouse.column > app.layout[1].x && mouse.column < app.layout[1].x + app.layout[1].width - 1 {
+                if !app.layout.is_empty()
+                    && app.layout.len() > 1
+                    && mouse.row == app.layout[1].y + 1
+                    && mouse.column > app.layout[1].x
+                    && mouse.column < app.layout[1].x + app.layout[1].width - 1
+                {
                     let new_cursor_pos = (mouse.column - (app.layout[1].x + 1)) as usize;
                     app.cursor_position = clamp_cursor(new_cursor_pos, &app.input);
                     return;
@@ -197,10 +189,12 @@ fn handle_mouse(mouse: MouseEvent, app: &mut App) {
             }
 
             if !app.column_layout.is_empty() {
-                let col = app.column_layout.iter().position(|&r|
-                    mouse.column >= r.x && mouse.column < r.x + r.width &&
-                    mouse.row >= r.y && mouse.row < r.y + r.height
-                );
+                let col = app.column_layout.iter().position(|&r| {
+                    mouse.column >= r.x
+                        && mouse.column < r.x + r.width
+                        && mouse.row >= r.y
+                        && mouse.row < r.y + r.height
+                });
 
                 if let Some(col) = col {
                     let status = match col {
@@ -218,7 +212,9 @@ fn handle_mouse(mouse: MouseEvent, app: &mut App) {
                             .filter(|(_, s)| s.status == status)
                             .collect();
 
-                        if let Some(item_index) = (mouse.row as usize).checked_sub(app.column_layout[col].y as usize + 1) {
+                        if let Some(item_index) =
+                            (mouse.row as usize).checked_sub(app.column_layout[col].y as usize + 1)
+                        {
                             if let Some((idx, _)) = entry_in_status.get(item_index) {
                                 app.selected_index = *idx;
                                 app.dragged_entry = Some((*idx, app.entry[*idx].status.clone()));
@@ -231,7 +227,10 @@ fn handle_mouse(mouse: MouseEvent, app: &mut App) {
         MouseEventKind::Up(_) => {
             if let Some((dragged_idx, _)) = app.dragged_entry {
                 if !app.column_layout.is_empty() {
-                    let col = app.column_layout.iter().position(|&r| mouse.column >= r.x && mouse.column < r.x + r.width);
+                    let col = app
+                        .column_layout
+                        .iter()
+                        .position(|&r| mouse.column >= r.x && mouse.column < r.x + r.width);
 
                     if let Some(col) = col {
                         let new_status = match col {
