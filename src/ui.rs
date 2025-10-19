@@ -30,6 +30,7 @@ pub fn draw_ui(f: &mut Frame, app: &mut App) {
     }
 
     draw_title_popup(f, app);
+    draw_error_popup(f, app);
 }
 
 fn draw_main(f: &mut Frame, area: Rect, app: &mut App) {
@@ -128,7 +129,7 @@ fn draw_input(f: &mut Frame, area: Rect, app: &mut App) {
 }
 
 fn draw_footer(f: &mut Frame, area: Rect) {
-    let text = "q: quit | a: add | e: edit | h: help | ↑/↓: select | ←/→: navigate";
+    let text = "q: quit | a: add | e: edit | h: help | up/down: select | left/right: navigate";
     let text_width = text.len() as u16;
     let text = if text_width > area.width {
         let mut truncated_text = text.chars().take(area.width as usize - 3).collect::<String>();
@@ -206,7 +207,7 @@ fn get_help_text_left() -> String {
     +: increase episode
     -: decrease episode
 
-    ↑/↓: select row
+    up/down: select row
     Shift + navigation: move entry
 
     h: toggle help
@@ -221,7 +222,7 @@ fn get_help_text_right() -> String {
     #: increase season
     x: remove entry
 
-    ←/→: select column
+    left/right: select column
     mouse: drag & drop
 
     q: quit
@@ -290,4 +291,83 @@ fn draw_title_popup(f: &mut Frame, app: &App) {
             f.render_widget(text, area);
         }
     }
+}
+
+fn draw_error_popup(f: &mut Frame, app: &mut App) {
+    if let Some(last_error_time) = app.last_error_time {
+        if last_error_time.elapsed().as_secs() > 3 {
+            app.error = None;
+            app.last_error_time = None;
+        } else if let Some(error) = &app.error {
+            let max_width = (f.size().width as f32 * 0.8) as u16;
+            let width = (error.len() as u16 + 2).min(max_width);
+
+            // Estimate height
+            let text_width = width.saturating_sub(2);
+            let wrapped_lines = if text_width > 0 {
+                error
+                    .lines()
+                    .map(|line| (line.chars().count() as u16 + text_width - 1) / text_width)
+                    .sum()
+            } else {
+                1
+            };
+            let height = wrapped_lines + 2; // +2 for top/bottom borders
+
+            let y = if let (InputMode::Adding | InputMode::Editing, Some(input_chunk)) = (&app.input_mode, app.layout.get(1)) {
+                 input_chunk.y.saturating_sub(height)
+            } else {
+                f.size().height.saturating_sub(height)
+            };
+
+            let area = Rect {
+                x: f.size().width.saturating_sub(width) / 2,
+                y,
+                width,
+                height,
+            };
+
+            let block = Block::default()
+                .title("Error")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Red))
+                .title_style(Style::default().fg(Color::LightYellow));
+            let text = Paragraph::new(error.as_str())
+                .block(block)
+                .wrap(Wrap { trim: true })
+                .style(Style::default().fg(Color::Red));
+
+            f.render_widget(Clear, area);
+            f.render_widget(text, area);
+        }
+    }
+}
+
+pub fn get_mouse_selection(app: &mut App) -> Option<usize> {
+    let mouse_x = app.mouse_pos.0;
+    let mouse_y = app.mouse_pos.1;
+
+    for (i, status) in [Status::Planning, Status::Watching, Status::Completed]
+        .iter()
+        .enumerate()
+    {
+        let col = app.column_layout[i];
+        if mouse_x >= col.x && mouse_x < col.x + col.width {
+            let entry_in_status: Vec<(usize, &crate::Entry)> = app
+                .entry
+                .iter()
+                .enumerate()
+                .filter(|(_, s)| &s.status == status)
+                .collect();
+
+            let list_start_y = col.y + 1;
+            if mouse_y >= list_start_y {
+                let selected_line = (mouse_y - list_start_y) as usize;
+                if let Some((original_index, _)) = entry_in_status.get(selected_line) {
+                    return Some(*original_index);
+                }
+            }
+        }
+    }
+    None
 }

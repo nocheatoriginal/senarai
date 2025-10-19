@@ -4,8 +4,9 @@ use crossterm::{
     ExecutableCommand,
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
-use std::io::{self, stdout};
 use senarai::{app::App, config, input, storage, ui};
+use std::io::{self, stdout};
+use std::time::Instant;
 
 fn main() -> io::Result<()> {
     stdout().execute(EnterAlternateScreen)?;
@@ -15,15 +16,31 @@ fn main() -> io::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
     terminal.clear()?;
 
-    let config = config::load_config();
+    let (config, config_error) = match config::load_config() {
+        Ok(config) => (config, None),
+        Err(e) => (config::Config::default(), Some(e)),
+    };
     let entry = storage::load_entry(&config);
     let mut app = App::new(entry, config);
 
-    loop {
-        terminal.draw(|f| ui::draw_ui(f, &mut app))?;
+    if let Some(e) = config_error {
+        app.error = Some(e);
+        app.last_error_time = Some(Instant::now());
+    }
 
-        if input::handle_input(&mut app)? {
-            break;
+    loop {
+        if let Err(e) = terminal.draw(|f| ui::draw_ui(f, &mut app)) {
+            app.error = Some(e.to_string());
+            app.last_error_time = Some(Instant::now());
+        }
+
+        match input::handle_input(&mut app) {
+            input::InputResult::Quit => break,
+            input::InputResult::Error(e) => {
+                app.error = Some(e);
+                app.last_error_time = Some(Instant::now());
+            }
+            input::InputResult::Success => {}
         }
     }
 

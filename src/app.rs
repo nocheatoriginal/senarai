@@ -1,5 +1,6 @@
 use crate::{config::Config, Entry, Status};
 use ratatui::layout::Rect;
+use std::time::Instant;
 
 pub enum InputMode {
     Normal,
@@ -20,6 +21,8 @@ pub struct App {
     pub show_help: bool,
     pub show_full_title: bool,
     pub config: Config,
+    pub error: Option<String>,
+    pub last_error_time: Option<Instant>,
 }
 
 impl App {
@@ -37,6 +40,8 @@ impl App {
             show_help: false,
             show_full_title: false,
             config,
+            error: None,
+            last_error_time: None,
         }
     }
 

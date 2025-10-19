@@ -1,28 +1,36 @@
 use crate::{app::App, app::InputMode, Status};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
-use std::io;
 
-pub fn handle_input(app: &mut App) -> io::Result<bool> {
-    if event::poll(std::time::Duration::from_millis(100))? {
-        match event::read()? {
-            Event::Key(key) => {
+pub enum InputResult {
+    Quit,
+    Error(String),
+    Success,
+}
+
+pub fn handle_input(app: &mut App) -> InputResult {
+    match event::poll(std::time::Duration::from_millis(100)) {
+        Ok(true) => match event::read() {
+            Ok(Event::Key(key)) => {
                 if key.kind == event::KeyEventKind::Press {
                     return handle_key(key, app);
                 }
             }
-            Event::Mouse(mouse) => {
+            Ok(Event::Mouse(mouse)) => {
                 handle_mouse(mouse, app);
             }
+            Err(e) => return InputResult::Error(e.to_string()),
             _ => {}
-        }
+        },
+        Err(e) => return InputResult::Error(e.to_string()),
+        _ => {}
     }
-    Ok(false)
+    InputResult::Success
 }
 
-fn handle_key(key: KeyEvent, app: &mut App) -> io::Result<bool> {
+fn handle_key(key: KeyEvent, app: &mut App) -> InputResult {
     match app.input_mode {
         InputMode::Normal => match key.code {
-            KeyCode::Char('q') => return Ok(true),
+            KeyCode::Char('q') => return InputResult::Quit,
             KeyCode::Up => {
                 if key.modifiers == KeyModifiers::SHIFT {
                     if app.selected_index > 0 {
@@ -167,7 +175,7 @@ fn handle_key(key: KeyEvent, app: &mut App) -> io::Result<bool> {
             _ => {}
         },
     }
-    Ok(false)
+    InputResult::Success
 }
 
 fn clamp_cursor(new_cursor_pos: usize, input: &str) -> usize {

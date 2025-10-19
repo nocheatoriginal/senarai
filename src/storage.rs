@@ -7,7 +7,9 @@ fn get_data_path(config: &Config) -> PathBuf {
     let mut path = PathBuf::from(shellexpand::tilde(&config.storage_path).to_string());
 
     if !path.exists() {
-        fs::create_dir_all(&path).unwrap();
+        if let Err(e) = fs::create_dir_all(&path) {
+            eprintln!("Failed to create storage directory: {}", e);
+        }
     }
     path.push(&config.storage_file);
     path
@@ -16,7 +18,13 @@ fn get_data_path(config: &Config) -> PathBuf {
 pub fn load_entry(config: &Config) -> Vec<Entry> {
     let path = get_data_path(config);
     if let Ok(data) = fs::read_to_string(path) {
-        serde_json::from_str(&data).unwrap_or_default()
+        match serde_json::from_str(&data) {
+            Ok(entry) => entry,
+            Err(e) => {
+                eprintln!("Failed to parse watchlist.json: {}", e);
+                Vec::new()
+            }
+        }
     } else {
         Vec::new()
     }
@@ -24,6 +32,14 @@ pub fn load_entry(config: &Config) -> Vec<Entry> {
 
 pub fn save_entry(entry: &Vec<Entry>, config: &Config) {
     let path = get_data_path(config);
-    let data = serde_json::to_string_pretty(entry).unwrap();
-    fs::write(path, data).unwrap();
+    match serde_json::to_string_pretty(entry) {
+        Ok(data) => {
+            if let Err(e) = fs::write(path, data) {
+                eprintln!("Failed to write to watchlist.json: {}", e);
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to serialize entry: {}", e);
+        }
+    }
 }

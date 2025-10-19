@@ -25,15 +25,18 @@ impl Default for Config {
     }
 }
 
-pub fn load_config() -> Config {
+pub fn load_config() -> Result<Config, String> {
     let config_path = env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|p| p.join(CONFIG_FILE_NAME)))
         .unwrap_or_else(|| PathBuf::from(CONFIG_FILE_NAME));
 
     if let Ok(data) = fs::read_to_string(config_path) {
-        serde_yaml::from_str(&data).unwrap_or_else(|_| Config::default())
+        match serde_yaml::from_str(&data) {
+            Ok(config) => Ok(config),
+            Err(e) => Err(format!("Failed to parse config.yaml: {}", e)),
+        }
     } else {
-        Config::default()
+        Ok(Config::default())
     }
 }
