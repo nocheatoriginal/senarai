@@ -10,4 +10,4 @@ if [ ! -d "target/release" ] || [ "$1" == "--clean" ] || [ "$1" == "-c" ]; then
 fi
 
 cp config.yaml target/release
-./target/release/wlt
+./target/release/senarai

@@ -1,6 +1,6 @@
 [package]
-name = "wlt"
-version = "0.1.0"
+name = "senarai"
+version = "0.1.1"
 edition = "2021"
 
 [dependencies]

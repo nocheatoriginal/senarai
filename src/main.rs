@@ -5,7 +5,7 @@ use crossterm::{
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io::{self, stdout};
-use wlt::{app::App, config, input, storage, ui};
+use senarai::{app::App, config, input, storage, ui};
 
 fn main() -> io::Result<()> {
     stdout().execute(EnterAlternateScreen)?;
