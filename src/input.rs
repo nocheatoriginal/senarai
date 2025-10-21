@@ -32,10 +32,10 @@ pub fn handle_input(app: &mut App) -> InputResult {
 fn handle_key(key: KeyEvent, app: &mut App) -> InputResult {
     match app.input_mode {
         InputMode::Normal => {
-            return handle_normal_mode_key(key, app);
+            handle_normal_mode_key(key, app)
         }
         InputMode::Adding | InputMode::Editing => {
-            return handle_input_mode_key(key, app);
+            handle_input_mode_key(key, app)
         }
     }
 }
@@ -185,7 +185,6 @@ fn handle_mouse(mouse: MouseEvent, app: &mut App) -> InputResult {
     match mouse.kind {
         MouseEventKind::Down(_) => {
             if let InputMode::Adding | InputMode::Editing = app.input_mode {
-                // Check if the click is within the input area
                 if !app.layout.is_empty()
                     && app.layout.len() > 1
                     && mouse.row == app.layout[1].y + 1
@@ -227,7 +226,7 @@ fn handle_mouse(mouse: MouseEvent, app: &mut App) -> InputResult {
                         {
                             if let Some((idx, _)) = entry_in_status.get(item_index) {
                                 app.selected_index = *idx;
-                                app.dragged_entry = Some((*idx, app.entry[*idx].status.clone()));
+                                app.dragged_entry = Some((*idx, app.entry[*idx].status));
                             }
                         }
                     }

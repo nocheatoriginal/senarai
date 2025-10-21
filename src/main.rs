@@ -21,8 +21,6 @@ fn main() -> io::Result<()> {
         Err(e) => (config::Config::default(), Some(e)),
     };
 
-    
-
     if let Err(e) = database::init_db(&config) {
         let mut app = App::new(Vec::new(), config.clone());
         app.error = Some(e.to_string());
@@ -53,8 +51,6 @@ fn main() -> io::Result<()> {
 
         let input_result = input::handle_input(&mut app);
 
-        
-
         match input_result {
             input::InputResult::Quit => break,
             input::InputResult::Error(e) => {
@@ -64,8 +60,6 @@ fn main() -> io::Result<()> {
             _ => {}
         }
     }
-
-    
 
     stdout().execute(LeaveAlternateScreen)?;
     stdout().execute(DisableMouseCapture)?;

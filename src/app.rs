@@ -51,7 +51,6 @@ impl App {
             Ok(true) => {
                 self.error = Some(format!("Entry with title '{}' already exists!", title));
                 self.last_error_time = Some(Instant::now());
-                return;
             }
             Ok(false) => {
                 let new_entry = Entry {
@@ -80,7 +79,7 @@ impl App {
         if let Some(s) = self.entry.get_mut(self.selected_index) {
             s.status = status;
             match database::update_entry(s, &self.config) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => {
                     self.error = Some(format!("Failed to update entry in database: {}", e));
                     self.last_error_time = Some(Instant::now());
@@ -93,7 +92,7 @@ impl App {
         if let Some(s) = self.entry.get_mut(self.selected_index) {
             s.episode += 1;
             match database::update_entry(s, &self.config) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => {
                     self.error = Some(format!("Failed to update entry in database: {}", e));
                     self.last_error_time = Some(Instant::now());
@@ -111,7 +110,7 @@ impl App {
                 s.episode = 0;
             }
             match database::update_entry(s, &self.config) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => {
                     self.error = Some(format!("Failed to update entry in database: {}", e));
                     self.last_error_time = Some(Instant::now());
@@ -125,7 +124,7 @@ impl App {
             s.season += 1;
             s.episode = 0;
             match database::update_entry(s, &self.config) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => {
                     self.error = Some(format!("Failed to update entry in database: {}", e));
                     self.last_error_time = Some(Instant::now());
@@ -202,7 +201,7 @@ impl App {
         if let Some(s) = self.entry.get_mut(self.selected_index) {
             s.title = new_title;
             match database::update_entry(s, &self.config) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => {
                     self.error = Some(format!("Failed to update entry title in database: {}", e));
                     self.last_error_time = Some(Instant::now());

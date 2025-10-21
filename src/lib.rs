@@ -50,5 +50,5 @@ pub mod config;
 pub mod consts;
 pub mod input;
 
-pub mod ui;
 pub mod database;
+pub mod ui;

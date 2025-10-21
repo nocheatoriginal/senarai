@@ -1,8 +1,8 @@
 use crate::{config::Config, consts, Entry, Status};
+use rusqlite::types::Type;
 use rusqlite::{Connection, Result};
 use std::path::Path;
 use uuid::Uuid;
-use rusqlite::types::Type;
 
 pub fn load_entry(config: &Config) -> Result<Vec<Entry>> {
     let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
@@ -18,8 +18,9 @@ pub fn load_entry(config: &Config) -> Result<Vec<Entry>> {
             _ => Status::Planning,
         };
         Ok(Entry {
-            id: Uuid::parse_str(&row.get::<_, String>(0)?) 
-                .map_err(|_e| rusqlite::Error::InvalidColumnType(0, "uuid".to_string(), Type::Text))?,
+            id: Uuid::parse_str(&row.get::<_, String>(0)?).map_err(|_e| {
+                rusqlite::Error::InvalidColumnType(0, "uuid".to_string(), Type::Text)
+            })?,
             title: row.get(1)?,
             status,
             season: row.get(3)?,
@@ -50,7 +51,13 @@ pub fn add_entry(entry: &Entry, config: &Config) -> Result<()> {
 
     conn.execute(
         "INSERT INTO entries (id, title, status, season, episode) VALUES (?1, ?2, ?3, ?4, ?5)",
-        (&entry.id.to_string(), &entry.title, &entry.status.to_string(), &entry.season, &entry.episode),
+        (
+            &entry.id.to_string(),
+            &entry.title,
+            &entry.status.to_string(),
+            &entry.season,
+            &entry.episode,
+        ),
     )?;
 
     Ok(())
@@ -72,7 +79,7 @@ pub fn delete_entry(id: &Uuid, config: &Config) -> Result<()> {
     let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
     let conn = Connection::open(db_path)?;
 
-    conn.execute("DELETE FROM entries WHERE id = ?1", &[&id.to_string()])?;
+    conn.execute("DELETE FROM entries WHERE id = ?1", [id.to_string()])?;
 
     Ok(())
 }

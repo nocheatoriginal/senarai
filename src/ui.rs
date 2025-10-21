@@ -303,7 +303,6 @@ fn draw_error_popup(f: &mut Frame, app: &mut App) {
             let max_width = (f.size().width as f32 * 0.8) as u16;
             let width = (error.len() as u16 + 2).min(max_width);
 
-            // Estimate height
             let text_width = width.saturating_sub(2);
             let wrapped_lines = if text_width > 0 {
                 error
@@ -313,7 +312,7 @@ fn draw_error_popup(f: &mut Frame, app: &mut App) {
             } else {
                 1
             };
-            let height = wrapped_lines + 2; // +2 for top/bottom borders
+            let height = wrapped_lines + 2;
 
             let y = if let (InputMode::Adding | InputMode::Editing, Some(input_chunk)) =
                 (&app.input_mode, app.layout.get(1))
