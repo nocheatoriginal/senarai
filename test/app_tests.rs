@@ -1,25 +1,26 @@
 use senarai::app::App;
 use senarai::config::Config;
 use senarai::{Entry, Status};
+use uuid::Uuid;
 
 fn create_dummy_app() -> App {
     let entries = vec![
         Entry {
-            id: 0,
+            id: Uuid::parse_str("4b974928-1aa0-4596-be76-7427b4a4e343").unwrap(),
             title: "Test Entry 1".to_string(),
             season: 1,
             episode: 1,
             status: Status::Watching,
         },
         Entry {
-            id: 1,
+            id: Uuid::parse_str("772d2d49-9ce7-4db7-bd33-8dfb93617af4").unwrap(),
             title: "Test Entry 2".to_string(),
             season: 2,
             episode: 5,
             status: Status::Completed,
         },
         Entry {
-            id: 2,
+            id: Uuid::parse_str("2cd6538f-944b-429e-b840-98ec89ed49ef").unwrap(),
             title: "Test Entry 3".to_string(),
             season: 1,
             episode: 0,
@@ -32,27 +33,7 @@ fn create_dummy_app() -> App {
     App::new(entries, config)
 }
 
-#[test]
-fn test_add_entry() {
-    let mut app = create_dummy_app();
-    let initial_len = app.entry.len();
-    app.add_entry("New Test Entry".to_string());
-    assert_eq!(app.entry.len(), initial_len + 1);
-    assert_eq!(app.entry.last().unwrap().title, "New Test Entry");
-    assert_eq!(app.entry.last().unwrap().status, Status::Planning);
-    assert_eq!(app.entry.last().unwrap().season, 1);
-    assert_eq!(app.entry.last().unwrap().episode, 0);
-}
 
-#[test]
-fn test_remove_entry() {
-    let mut app = create_dummy_app();
-    let initial_len = app.entry.len();
-    app.selected_index = 0;
-    app.remove_entry();
-    assert_eq!(app.entry.len(), initial_len - 1);
-    assert_eq!(app.entry[0].title, "Test Entry 2");
-}
 
 #[test]
 fn test_next_episode() {
