@@ -21,3 +21,4 @@ pub const TITLE_POPUP_HEIGHT: u16 = 10;
 pub const PADDING: usize = 2;
 
 pub const ERROR_POPUP_DURATION: u64 = 3;
+pub const DB_FILE_NAME: &str = "senarai.db";

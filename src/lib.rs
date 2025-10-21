@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Status {
@@ -37,6 +38,7 @@ impl ToString for Status {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Entry {
+    pub id: Uuid,
     pub title: String,
     pub season: u32,
     pub episode: u32,
@@ -49,3 +51,4 @@ pub mod consts;
 pub mod input;
 pub mod storage;
 pub mod ui;
+pub mod database;

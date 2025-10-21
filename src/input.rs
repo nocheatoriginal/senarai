@@ -6,6 +6,7 @@ pub enum InputResult {
     Quit,
     Error(String),
     Success,
+    Modified,
 }
 
 pub fn handle_input(app: &mut App) -> InputResult {
@@ -17,7 +18,7 @@ pub fn handle_input(app: &mut App) -> InputResult {
                 }
             }
             Ok(Event::Mouse(mouse)) => {
-                handle_mouse(mouse, app);
+                return handle_mouse(mouse, app);
             }
             Err(e) => return InputResult::Error(e.to_string()),
             _ => {}
@@ -31,15 +32,12 @@ pub fn handle_input(app: &mut App) -> InputResult {
 fn handle_key(key: KeyEvent, app: &mut App) -> InputResult {
     match app.input_mode {
         InputMode::Normal => {
-            if handle_normal_mode_key(key, app) == InputResult::Quit {
-                return InputResult::Quit;
-            }
+            return handle_normal_mode_key(key, app);
         }
         InputMode::Adding | InputMode::Editing => {
-            handle_input_mode_key(key, app);
+            return handle_input_mode_key(key, app);
         }
     }
-    InputResult::Success
 }
 
 fn handle_normal_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
@@ -51,6 +49,7 @@ fn handle_normal_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
                     let current_entry = app.entry.remove(app.selected_index);
                     app.entry.insert(app.selected_index - 1, current_entry);
                     app.selected_index -= 1;
+                    return InputResult::Modified;
                 }
             } else {
                 app.prev_entry();
@@ -62,6 +61,7 @@ fn handle_normal_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
                     let current_entry = app.entry.remove(app.selected_index);
                     app.entry.insert(app.selected_index + 1, current_entry);
                     app.selected_index += 1;
+                    return InputResult::Modified;
                 }
             } else {
                 app.next_entry();
@@ -72,6 +72,7 @@ fn handle_normal_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
                 if let Some(s) = app.entry.get(app.selected_index) {
                     let new_status = s.status.next();
                     app.move_to(new_status);
+                    return InputResult::Modified;
                 }
             } else {
                 app.select_next_column();
@@ -82,6 +83,7 @@ fn handle_normal_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
                 if let Some(s) = app.entry.get(app.selected_index) {
                     let new_status = s.status.prev();
                     app.move_to(new_status);
+                    return InputResult::Modified;
                 }
             } else {
                 app.select_prev_column();
@@ -107,22 +109,26 @@ fn handle_normal_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
         }
         KeyCode::Char('+') => {
             app.next_episode();
+            return InputResult::Modified;
         }
         KeyCode::Char('-') => {
             app.prev_episode();
+            return InputResult::Modified;
         }
         KeyCode::Char('#') => {
             app.next_season();
+            return InputResult::Modified;
         }
         KeyCode::Char('x') => {
             app.remove_entry();
+            return InputResult::Modified;
         }
         _ => {}
     }
     InputResult::Success
 }
 
-fn handle_input_mode_key(key: KeyEvent, app: &mut App) {
+fn handle_input_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
     match key.code {
         KeyCode::Enter => {
             if let InputMode::Adding = app.input_mode {
@@ -135,6 +141,7 @@ fn handle_input_mode_key(key: KeyEvent, app: &mut App) {
             }
             app.input_mode = InputMode::Normal;
             app.cursor_position = 0;
+            return InputResult::Modified;
         }
         KeyCode::Char(c) => {
             app.input.insert(app.cursor_position, c);
@@ -163,13 +170,14 @@ fn handle_input_mode_key(key: KeyEvent, app: &mut App) {
         }
         _ => {}
     }
+    InputResult::Success
 }
 
 fn clamp_cursor(new_cursor_pos: usize, input: &str) -> usize {
     new_cursor_pos.clamp(0, input.len())
 }
 
-fn handle_mouse(mouse: MouseEvent, app: &mut App) {
+fn handle_mouse(mouse: MouseEvent, app: &mut App) -> InputResult {
     app.mouse_pos = (mouse.column, mouse.row);
 
     match mouse.kind {
@@ -184,7 +192,7 @@ fn handle_mouse(mouse: MouseEvent, app: &mut App) {
                 {
                     let new_cursor_pos = (mouse.column - (app.layout[1].x + 1)) as usize;
                     app.cursor_position = clamp_cursor(new_cursor_pos, &app.input);
-                    return;
+                    return InputResult::Success;
                 }
             }
 
@@ -242,6 +250,8 @@ fn handle_mouse(mouse: MouseEvent, app: &mut App) {
 
                         if let Some(new_status) = new_status {
                             app.entry[dragged_idx].status = new_status;
+                            app.dragged_entry = None;
+                            return InputResult::Modified;
                         }
                     }
                 }
@@ -250,4 +260,5 @@ fn handle_mouse(mouse: MouseEvent, app: &mut App) {
         }
         _ => {}
     }
+    InputResult::Success
 }

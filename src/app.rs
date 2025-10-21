@@ -1,6 +1,7 @@
 use crate::{config::Config, Entry, Status};
 use ratatui::layout::Rect;
 use std::time::Instant;
+use uuid::Uuid;
 
 pub enum InputMode {
     Normal,
@@ -46,7 +47,9 @@ impl App {
     }
 
     pub fn add_entry(&mut self, title: String) {
+        let new_id = Uuid::new_v4();
         self.entry.push(Entry {
+            id: new_id,
             title,
             season: 1,
             episode: 0,

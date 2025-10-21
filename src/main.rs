@@ -4,7 +4,7 @@ use crossterm::{
     ExecutableCommand,
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
-use senarai::{app::App, config, input, storage, ui};
+use senarai::{app::App, config, database, input, storage, ui};
 use std::io::{self, stdout};
 use std::time::Instant;
 
@@ -20,8 +20,25 @@ fn main() -> io::Result<()> {
         Ok(config) => (config, None),
         Err(e) => (config::Config::default(), Some(e)),
     };
-    let entry = storage::load_entry(&config);
-    let mut app = App::new(entry, config);
+
+    
+
+    if let Err(e) = database::init_db(&config) {
+        let mut app = App::new(Vec::new(), config.clone());
+        app.error = Some(e.to_string());
+        app.last_error_time = Some(Instant::now());
+    }
+
+    let entry = match storage::load_entry(&config) {
+        Ok(entry) => entry,
+        Err(e) => {
+            let mut app = App::new(Vec::new(), config.clone());
+            app.error = Some(e.to_string());
+            app.last_error_time = Some(Instant::now());
+            Vec::new()
+        }
+    };
+    let mut app = App::new(entry, config.clone());
 
     if let Some(e) = config_error {
         app.error = Some(e);
@@ -34,17 +51,29 @@ fn main() -> io::Result<()> {
             app.last_error_time = Some(Instant::now());
         }
 
-        match input::handle_input(&mut app) {
+        let input_result = input::handle_input(&mut app);
+
+        if matches!(input_result, input::InputResult::Modified) {
+            if let Err(e) = storage::save_entry(&app.entry, &app.config) {
+                app.error = Some(format!("Failed to save: {}", e));
+                app.last_error_time = Some(Instant::now());
+            }
+        }
+
+        match input_result {
             input::InputResult::Quit => break,
             input::InputResult::Error(e) => {
                 app.error = Some(e);
                 app.last_error_time = Some(Instant::now());
             }
-            input::InputResult::Success => {}
+            _ => {}
         }
     }
 
-    storage::save_entry(&app.entry, &app.config);
+    if let Err(e) = storage::save_entry(&app.entry, &app.config) {
+        app.error = Some(e.to_string());
+        app.last_error_time = Some(Instant::now());
+    };
 
     stdout().execute(LeaveAlternateScreen)?;
     stdout().execute(DisableMouseCapture)?;

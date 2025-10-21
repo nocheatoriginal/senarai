@@ -5,18 +5,21 @@ use senarai::{Entry, Status};
 fn create_dummy_app() -> App {
     let entries = vec![
         Entry {
+            id: 0,
             title: "Test Entry 1".to_string(),
             season: 1,
             episode: 1,
             status: Status::Watching,
         },
         Entry {
+            id: 1,
             title: "Test Entry 2".to_string(),
             season: 2,
             episode: 5,
             status: Status::Completed,
         },
         Entry {
+            id: 2,
             title: "Test Entry 3".to_string(),
             season: 1,
             episode: 0,
@@ -25,7 +28,6 @@ fn create_dummy_app() -> App {
     ];
     let config = Config {
         storage_path: "dummy_path".to_string(),
-        storage_file: "dummy.json".to_string(),
     };
     App::new(entries, config)
 }

@@ -8,7 +8,6 @@ const CONFIG_FILE_NAME: &str = "config.yaml";
 #[derive(Deserialize, Clone)]
 pub struct Config {
     pub storage_path: String,
-    pub storage_file: String,
 }
 
 impl Default for Config {
@@ -20,7 +19,6 @@ impl Default for Config {
 
         Self {
             storage_path: storage_path.to_str().unwrap_or(".").to_string(),
-            storage_file: "watchlist.json".to_string(),
         }
     }
 }
@@ -32,8 +30,11 @@ pub fn load_config() -> Result<Config, String> {
         .unwrap_or_else(|| PathBuf::from(CONFIG_FILE_NAME));
 
     if let Ok(data) = fs::read_to_string(config_path) {
-        match serde_yaml::from_str(&data) {
-            Ok(config) => Ok(config),
+        match serde_yaml::from_str::<Config>(&data) {
+            Ok(mut config) => {
+                config.storage_path = shellexpand::tilde(&config.storage_path).to_string();
+                Ok(config)
+            }
             Err(e) => Err(format!("Failed to parse config.yaml: {}", e)),
         }
     } else {
