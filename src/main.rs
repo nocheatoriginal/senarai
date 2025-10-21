@@ -4,7 +4,7 @@ use crossterm::{
     ExecutableCommand,
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
-use senarai::{app::App, config, database, input, storage, ui};
+use senarai::{app::App, config, database, input, ui};
 use std::io::{self, stdout};
 use std::time::Instant;
 
@@ -29,7 +29,7 @@ fn main() -> io::Result<()> {
         app.last_error_time = Some(Instant::now());
     }
 
-    let entry = match storage::load_entry(&config) {
+    let entry = match database::load_entry(&config) {
         Ok(entry) => entry,
         Err(e) => {
             let mut app = App::new(Vec::new(), config.clone());
@@ -53,12 +53,7 @@ fn main() -> io::Result<()> {
 
         let input_result = input::handle_input(&mut app);
 
-        if matches!(input_result, input::InputResult::Modified) {
-            if let Err(e) = storage::save_entry(&app.entry, &app.config) {
-                app.error = Some(format!("Failed to save: {}", e));
-                app.last_error_time = Some(Instant::now());
-            }
-        }
+        
 
         match input_result {
             input::InputResult::Quit => break,
@@ -70,10 +65,7 @@ fn main() -> io::Result<()> {
         }
     }
 
-    if let Err(e) = storage::save_entry(&app.entry, &app.config) {
-        app.error = Some(e.to_string());
-        app.last_error_time = Some(Instant::now());
-    };
+    
 
     stdout().execute(LeaveAlternateScreen)?;
     stdout().execute(DisableMouseCapture)?;

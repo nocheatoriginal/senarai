@@ -34,16 +34,47 @@ pub fn load_entry(config: &Config) -> Result<Vec<Entry>> {
     Ok(entries)
 }
 
-pub fn save_entry(entry: &Vec<Entry>, config: &Config) -> Result<()> {
+pub fn entry_exists_by_title(title: &str, config: &Config) -> Result<bool> {
     let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
     let conn = Connection::open(db_path)?;
 
-    for item in entry {
+    let mut stmt = conn.prepare("SELECT COUNT(*) FROM entries WHERE title = ?1")?;
+    let count: i64 = stmt.query_row([title], |row| row.get(0))?;
+
+    Ok(count > 0)
+}
+
+pub fn add_entry(entry: &Entry, config: &Config) -> Result<()> {
+    let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
+    let conn = Connection::open(db_path)?;
+
+    conn.execute(
+        "INSERT INTO entries (id, title, status, season, episode) VALUES (?1, ?2, ?3, ?4, ?5)",
+        (&entry.id.to_string(), &entry.title, &entry.status.to_string(), &entry.season, &entry.episode),
+    )?;
+
+    Ok(())
+}
+
+pub fn save_entries(entries: &Vec<Entry>, config: &Config) -> Result<()> {
+    let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
+    let conn = Connection::open(db_path)?;
+
+    for item in entries {
         conn.execute(
             "INSERT OR REPLACE INTO entries (id, title, status, season, episode) VALUES (?1, ?2, ?3, ?4, ?5)",
             (&item.id.to_string(), &item.title, &item.status.to_string(), &item.season, &item.episode),
         )?;
     }
+
+    Ok(())
+}
+
+pub fn delete_entry(id: &Uuid, config: &Config) -> Result<()> {
+    let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
+    let conn = Connection::open(db_path)?;
+
+    conn.execute("DELETE FROM entries WHERE id = ?1", &[&id.to_string()])?;
 
     Ok(())
 }
