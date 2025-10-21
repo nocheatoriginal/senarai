@@ -56,16 +56,14 @@ pub fn add_entry(entry: &Entry, config: &Config) -> Result<()> {
     Ok(())
 }
 
-pub fn save_entries(entries: &Vec<Entry>, config: &Config) -> Result<()> {
+pub fn update_entry(entry: &Entry, config: &Config) -> Result<()> {
     let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
     let conn = Connection::open(db_path)?;
 
-    for item in entries {
-        conn.execute(
-            "INSERT OR REPLACE INTO entries (id, title, status, season, episode) VALUES (?1, ?2, ?3, ?4, ?5)",
-            (&item.id.to_string(), &item.title, &item.status.to_string(), &item.season, &item.episode),
-        )?;
-    }
+    conn.execute(
+        "INSERT OR REPLACE INTO entries (id, title, status, season, episode) VALUES (?1, ?2, ?3, ?4, ?5)",
+        (&entry.id.to_string(), &entry.title, &entry.status.to_string(), &entry.season, &entry.episode),
+    )?;
 
     Ok(())
 }

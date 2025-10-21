@@ -136,7 +136,9 @@ fn handle_input_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
                 app.add_entry(new_entry);
             } else if let InputMode::Editing = app.input_mode {
                 if let Some(s) = app.entry.get_mut(app.selected_index) {
-                    s.title = app.input.drain(..).collect();
+                    let new_title: String = app.input.drain(..).collect();
+                    s.title = new_title.clone();
+                    app.edit_entry_title(new_title);
                 }
             }
             app.input_mode = InputMode::Normal;
