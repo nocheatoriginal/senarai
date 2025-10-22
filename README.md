@@ -38,11 +38,9 @@ Here's an example of a `config.yaml` file:
 
 ```yaml
 storage_path: "~/Desktop/projects/senarai/storage"
-storage_file: "watchlist.json"
 ```
 
-* `storage_path`: Specifies the directory where your `watchlist.json` file will be stored. If not provided, it defaults to the directory where the `senarai` executable is located.
-* `storage_file`: Specifies the name of your watchlist data file. Defaults to `watchlist.json`.
+* `storage_path`: Specifies the directory where your `senarai.db` database file will be stored. If not provided, it defaults to the directory where the `senarai` executable is located.
 
 ## Usage
 
