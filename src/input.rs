@@ -31,12 +31,9 @@ pub fn handle_input(app: &mut App) -> InputResult {
 
 fn handle_key(key: KeyEvent, app: &mut App) -> InputResult {
     match app.input_mode {
-        InputMode::Normal => {
-            handle_normal_mode_key(key, app)
-        }
-        InputMode::Adding | InputMode::Editing => {
-            handle_input_mode_key(key, app)
-        }
+        InputMode::Normal => handle_normal_mode_key(key, app),
+        InputMode::Adding | InputMode::Editing => handle_input_mode_key(key, app),
+        InputMode::ConfirmDelete => handle_confirm_delete_mode_key(key, app),
     }
 }
 
@@ -120,8 +117,7 @@ fn handle_normal_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
             return InputResult::Modified;
         }
         KeyCode::Char('x') => {
-            app.remove_entry();
-            return InputResult::Modified;
+            app.input_mode = InputMode::ConfirmDelete;
         }
         _ => {}
     }
@@ -173,6 +169,21 @@ fn handle_input_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
         _ => {}
     }
     InputResult::Success
+}
+
+fn handle_confirm_delete_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
+    match key.code {
+        KeyCode::Char('y') | KeyCode::Char('Y') => {
+            app.remove_entry();
+            app.input_mode = InputMode::Normal;
+            InputResult::Modified
+        }
+        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+            app.input_mode = InputMode::Normal;
+            InputResult::Success
+        }
+        _ => InputResult::Success,
+    }
 }
 
 fn clamp_cursor(new_cursor_pos: usize, input: &str) -> usize {

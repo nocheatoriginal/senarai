@@ -5,7 +5,9 @@ pub fn draw_ui(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(match app.input_mode {
-            InputMode::Normal => [Constraint::Min(0), Constraint::Length(1)].as_ref(),
+            InputMode::Normal | InputMode::ConfirmDelete => {
+                [Constraint::Min(0), Constraint::Length(1)].as_ref()
+            }
             InputMode::Adding | InputMode::Editing => [
                 Constraint::Min(0),
                 Constraint::Length(3),
@@ -29,6 +31,10 @@ pub fn draw_ui(f: &mut Frame, app: &mut App) {
 
     draw_title_popup(f, app);
     draw_error_popup(f, app);
+
+    if let InputMode::ConfirmDelete = app.input_mode {
+        draw_confirmation_popup(f, app);
+    }
 }
 
 fn draw_main(f: &mut Frame, area: Rect, app: &mut App) {
@@ -343,6 +349,36 @@ fn draw_error_popup(f: &mut Frame, app: &mut App) {
             f.render_widget(text, area);
         }
     }
+}
+
+fn draw_confirmation_popup(f: &mut Frame, _app: &App) {
+    let area = centered_rect(
+        consts::CONFIRMATION_POPUP_WIDTH,
+        consts::CONFIRMATION_POPUP_HEIGHT,
+        f.size(),
+    );
+    let block = Block::default()
+        .title("Confirm Deletion")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(consts::BORDER_COLOR))
+        .title_style(Style::default().fg(consts::TITLE_COLOR))
+        .padding(Padding::new(2, 2, 1, 1));
+
+    f.render_widget(Clear, area);
+    f.render_widget(block.clone(), area);
+
+    let chunks = Layout::default()
+        .margin(1)
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(1)].as_ref())
+        .split(block.inner(area));
+
+    let message = "Are you sure you want to delete this entry? (y/n)";
+    let paragraph = Paragraph::new(message)
+        .style(Style::default().fg(consts::TEXT_COLOR))
+        .alignment(Alignment::Center);
+
+    f.render_widget(paragraph, chunks[0]);
 }
 
 pub fn get_mouse_selection(app: &mut App) -> Option<usize> {

@@ -7,6 +7,7 @@ pub enum InputMode {
     Normal,
     Editing,
     Adding,
+    ConfirmDelete,
 }
 
 pub struct App {
