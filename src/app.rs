@@ -62,7 +62,10 @@ impl App {
                     status: Status::Planning,
                 };
                 match database::add_entry(&new_entry, &self.config) {
-                    Ok(_) => self.entry.push(new_entry),
+                    Ok(_) => {
+                        self.entry.push(new_entry);
+                        self.selected_index = self.entry.len() - 1;
+                    }
                     Err(e) => {
                         self.error = Some(format!("Failed to add entry to database: {}", e));
                         self.last_error_time = Some(Instant::now());
@@ -164,18 +167,80 @@ impl App {
         }
     }
 
+    fn get_entries_by_status(&self, status: Status) -> Vec<(usize, &Entry)> {
+        self.entry
+            .iter()
+            .enumerate()
+            .filter(|(_, entry)| entry.status == status)
+            .collect()
+    }
+
     pub fn next_entry(&mut self) {
-        if !self.entry.is_empty() {
-            self.selected_index = (self.selected_index + 1) % self.entry.len();
+        if self.entry.is_empty() {
+            return;
+        }
+
+        let current_entry_status = self.entry[self.selected_index].status;
+        let entries_in_current_status = self.get_entries_by_status(current_entry_status);
+
+        let current_entry_pos_in_status = entries_in_current_status
+            .iter()
+            .position(|(idx, _)| *idx == self.selected_index);
+
+        if let Some(pos) = current_entry_pos_in_status {
+            if pos + 1 < entries_in_current_status.len() {
+                // Move to the next entry in the current column
+                self.selected_index = entries_in_current_status[pos + 1].0;
+            } else {
+                // Move to the next column
+                let mut next_status = current_entry_status.next();
+                for _ in 0..3 {
+                    let entries_in_next_status = self.get_entries_by_status(next_status);
+                    if !entries_in_next_status.is_empty() {
+                        self.selected_index = entries_in_next_status[0].0;
+                        return;
+                    }
+                    next_status = next_status.next();
+                }
+                // If no entries in any column, stay on current or wrap to first if possible
+                if !self.entry.is_empty() {
+                    self.selected_index = 0;
+                }
+            }
         }
     }
 
     pub fn prev_entry(&mut self) {
-        if !self.entry.is_empty() {
-            if self.selected_index == 0 {
-                self.selected_index = self.entry.len() - 1;
+        if self.entry.is_empty() {
+            return;
+        }
+
+        let current_entry_status = self.entry[self.selected_index].status;
+        let entries_in_current_status = self.get_entries_by_status(current_entry_status);
+
+        let current_entry_pos_in_status = entries_in_current_status
+            .iter()
+            .position(|(idx, _)| *idx == self.selected_index);
+
+        if let Some(pos) = current_entry_pos_in_status {
+            if pos > 0 {
+                // Move to the previous entry in the current column
+                self.selected_index = entries_in_current_status[pos - 1].0;
             } else {
-                self.selected_index -= 1;
+                // Move to the previous column
+                let mut prev_status = current_entry_status.prev();
+                for _ in 0..3 {
+                    let entries_in_prev_status = self.get_entries_by_status(prev_status);
+                    if !entries_in_prev_status.is_empty() {
+                        self.selected_index = entries_in_prev_status[entries_in_prev_status.len() - 1].0;
+                        return;
+                    }
+                    prev_status = prev_status.prev();
+                }
+                // If no entries in any column, stay on current or wrap to last if possible
+                if !self.entry.is_empty() {
+                    self.selected_index = self.entry.len() - 1;
+                }
             }
         }
     }
