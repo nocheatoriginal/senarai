@@ -189,10 +189,8 @@ impl App {
 
         if let Some(pos) = current_entry_pos_in_status {
             if pos + 1 < entries_in_current_status.len() {
-                // Move to the next entry in the current column
                 self.selected_index = entries_in_current_status[pos + 1].0;
             } else {
-                // Move to the next column
                 let mut next_status = current_entry_status.next();
                 for _ in 0..3 {
                     let entries_in_next_status = self.get_entries_by_status(next_status);
@@ -202,7 +200,6 @@ impl App {
                     }
                     next_status = next_status.next();
                 }
-                // If no entries in any column, stay on current or wrap to first if possible
                 if !self.entry.is_empty() {
                     self.selected_index = 0;
                 }
@@ -224,10 +221,8 @@ impl App {
 
         if let Some(pos) = current_entry_pos_in_status {
             if pos > 0 {
-                // Move to the previous entry in the current column
                 self.selected_index = entries_in_current_status[pos - 1].0;
             } else {
-                // Move to the previous column
                 let mut prev_status = current_entry_status.prev();
                 for _ in 0..3 {
                     let entries_in_prev_status = self.get_entries_by_status(prev_status);
@@ -237,7 +232,6 @@ impl App {
                     }
                     prev_status = prev_status.prev();
                 }
-                // If no entries in any column, stay on current or wrap to last if possible
                 if !self.entry.is_empty() {
                     self.selected_index = self.entry.len() - 1;
                 }
@@ -271,6 +265,78 @@ impl App {
                 Err(e) => {
                     self.error = Some(format!("Failed to update entry title in database: {}", e));
                     self.last_error_time = Some(Instant::now());
+                }
+            }
+        }
+    }
+
+    pub fn move_entry_up_in_column(&mut self) {
+        if self.entry.is_empty() {
+            return;
+        }
+
+        let current_entry_status = self.entry[self.selected_index].status;
+        let entries_in_current_status = self.get_entries_by_status(current_entry_status);
+
+        let current_entry_pos_in_status = entries_in_current_status
+            .iter()
+            .position(|(idx, _)| *idx == self.selected_index);
+
+        if let Some(pos) = current_entry_pos_in_status {
+            if pos > 0 {
+                let (global_idx_current, _) = entries_in_current_status[pos];
+                let (global_idx_prev, _) = entries_in_current_status[pos - 1];
+
+                self.entry.swap(global_idx_current, global_idx_prev);
+                self.selected_index = global_idx_prev;
+
+                if let Some(entry1) = self.entry.get(global_idx_current) {
+                    if let Err(e) = database::update_entry(entry1, &self.config) {
+                        self.error = Some(format!("Failed to update entry in database: {}", e));
+                        self.last_error_time = Some(Instant::now());
+                    }
+                }
+                if let Some(entry2) = self.entry.get(global_idx_prev) {
+                    if let Err(e) = database::update_entry(entry2, &self.config) {
+                        self.error = Some(format!("Failed to update entry in database: {}", e));
+                        self.last_error_time = Some(Instant::now());
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn move_entry_down_in_column(&mut self) {
+        if self.entry.is_empty() {
+            return;
+        }
+
+        let current_entry_status = self.entry[self.selected_index].status;
+        let entries_in_current_status = self.get_entries_by_status(current_entry_status);
+
+        let current_entry_pos_in_status = entries_in_current_status
+            .iter()
+            .position(|(idx, _)| *idx == self.selected_index);
+
+        if let Some(pos) = current_entry_pos_in_status {
+            if pos + 1 < entries_in_current_status.len() {
+                let (global_idx_current, _) = entries_in_current_status[pos];
+                let (global_idx_next, _) = entries_in_current_status[pos + 1];
+
+                self.entry.swap(global_idx_current, global_idx_next);
+                self.selected_index = global_idx_next;
+
+                if let Some(entry1) = self.entry.get(global_idx_current) {
+                    if let Err(e) = database::update_entry(entry1, &self.config) {
+                        self.error = Some(format!("Failed to update entry in database: {}", e));
+                        self.last_error_time = Some(Instant::now());
+                    }
+                }
+                if let Some(entry2) = self.entry.get(global_idx_next) {
+                    if let Err(e) = database::update_entry(entry2, &self.config) {
+                        self.error = Some(format!("Failed to update entry in database: {}", e));
+                        self.last_error_time = Some(Instant::now());
+                    }
                 }
             }
         }

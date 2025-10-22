@@ -10,7 +10,7 @@ pub enum InputResult {
 }
 
 pub fn handle_input(app: &mut App) -> InputResult {
-    match event::poll(std::time::Duration::from_millis(100)) {
+    match event::poll(std::time::Duration::from_millis(50)) {
         Ok(true) => match event::read() {
             Ok(Event::Key(key)) => {
                 if key.kind == event::KeyEventKind::Press {
@@ -42,24 +42,16 @@ fn handle_normal_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
         KeyCode::Char('q') => return InputResult::Quit,
         KeyCode::Up => {
             if key.modifiers == KeyModifiers::SHIFT {
-                if app.selected_index > 0 {
-                    let current_entry = app.entry.remove(app.selected_index);
-                    app.entry.insert(app.selected_index - 1, current_entry);
-                    app.selected_index -= 1;
-                    return InputResult::Modified;
-                }
+                app.move_entry_up_in_column();
+                return InputResult::Modified;
             } else {
                 app.prev_entry();
             }
         }
         KeyCode::Down => {
             if key.modifiers == KeyModifiers::SHIFT {
-                if app.selected_index < app.entry.len() - 1 {
-                    let current_entry = app.entry.remove(app.selected_index);
-                    app.entry.insert(app.selected_index + 1, current_entry);
-                    app.selected_index += 1;
-                    return InputResult::Modified;
-                }
+                app.move_entry_down_in_column();
+                return InputResult::Modified;
             } else {
                 app.next_entry();
             }
