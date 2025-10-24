@@ -63,8 +63,14 @@ impl App {
                 };
                 match database::add_entry(&new_entry, &self.config) {
                     Ok(_) => {
-                        self.entry.push(new_entry);
-                        self.selected_index = self.entry.len() - 1;
+                        let insert_index = self
+                            .entry
+                            .iter()
+                            .rposition(|entry| entry.status == Status::Planning)
+                            .map_or(0, |i| i + 1);
+
+                        self.entry.insert(insert_index, new_entry);
+                        self.selected_index = insert_index;
                     }
                     Err(e) => {
                         self.error = Some(format!("Failed to add entry to database: {}", e));
