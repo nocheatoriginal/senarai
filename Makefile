@@ -33,7 +33,10 @@ build:
 	@cp config.yaml $(RELEASE_DIR)/config.yaml
 	$(call log_info,Copied config.yaml to $(RELEASE_DIR)/config.yaml)
 
-run: build
+run:
+	@if [ ! -f $(RELEASE_BINARY) ]; then \
+		make build; \
+	fi
 	$(call log_important,Running application)
 	@$(RELEASE_BINARY)
 
