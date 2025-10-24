@@ -14,21 +14,29 @@ Senarai is a lightweight and efficient command-line interface (CLI) application 
 
 ## Installation
 
-To install Senarai, you'll need to have [Rust and Cargo](https://www.rust-lang.org/tools/install) installed on your system. Once Rust is set up, you can build and start the app as follows:
+To install Senarai, you'll need to have [Rust and Cargo](https://www.rust-lang.org/tools/install) and `make` installed on your system. Once they are set up, you can build and start the app as follows:
 
 ```bash
 git clone git@github.com:nocheatoriginal/senarai.git
 cd senarai
-./build.sh -c
+make
+```
 
+This command will compile the app and install the `senarai` executable into `target/release`. To run the app, you can use:
+
+```bash
+make run
+```
+
+Or directly execute the binary:
+
+```bash
 ./target/release/senarai
 ```
 
-This command will compile the app and install the `senarai` executable into `target/release`.
-
 ## Setup and Configuration
 
-Senarai uses a `config.yaml` file for its settings, primarily to define the storage location of your watchlist data. The default configuration located in the root directory of senarai will be copied to `target/release` after using the build script.
+Senarai uses a `config.yaml` file for its settings, primarily to define the storage location of your watchlist data. The default configuration located in the root directory of senarai will be copied to `target/release` after using the Makefile.
 
 ### config.yaml
 
@@ -42,19 +50,11 @@ storage_path: "~/Desktop/projects/senarai/storage"
 
 * `storage_path`: Specifies the directory where your `senarai.db` database file will be stored. If not provided, it defaults to the directory where the `senarai` executable is located.
 
-## Usage
-
-Once installed and configured, you can run Senarai from your terminal:
-
-```bash
-./target/release/senarai # Or create an alias for easier access
-```
-
-### Keybindings
+## Keybindings
 
 Senarai operates in different modes: **Normal**, **Adding**, and **Editing**.
 
-#### Normal Mode
+### Normal Mode
 
 | Keybinding          | Action                                            |
 | :------------------ | :------------------------------------------------ |
@@ -76,7 +76,7 @@ Senarai operates in different modes: **Normal**, **Adding**, and **Editing**.
 | `#`                 | Increment season count                            |
 | `x`                 | Remove the selected entry                         |
 
-#### Adding / Editing Mode
+### Adding / Editing Mode
 
 | Keybinding          | Action                                            |
 | :------------------ | :------------------------------------------------ |
