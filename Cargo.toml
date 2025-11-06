@@ -11,6 +11,7 @@ serde_json = "1.0"
 serde_yaml = "0.9"
 shellexpand = "3.1.1"
 rusqlite = { version = "0.31.0", features = ["bundled"] }
+unicode-segmentation = "1.10.0"
 uuid = { version = "1.18.1", features = ["v4", "serde"] }
 
 [[test]]

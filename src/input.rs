@@ -1,5 +1,6 @@
 use crate::{app::App, app::InputMode, Status};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
+use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(PartialEq)]
 pub enum InputResult {
@@ -86,7 +87,7 @@ fn handle_normal_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
         KeyCode::Char('e') => {
             if let Some(s) = app.entry.get(app.selected_index) {
                 app.input = s.title.clone();
-                app.cursor_position = app.input.len();
+                app.cursor_position = app.input.graphemes(true).count();
                 app.input_mode = InputMode::Editing;
             }
         }
@@ -134,18 +135,30 @@ fn handle_input_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
             return InputResult::Modified;
         }
         KeyCode::Char(c) => {
-            app.input.insert(app.cursor_position, c);
+            let graphemes = app.input.graphemes(true).collect::<Vec<&str>>();
+            let byte_pos = if app.cursor_position >= graphemes.len() {
+                app.input.len()
+            } else {
+                graphemes.iter().take(app.cursor_position).map(|s| s.len()).sum()
+            };
+            app.input.insert(byte_pos, c);
             app.cursor_position = clamp_cursor(app.cursor_position + 1, &app.input);
         }
         KeyCode::Backspace => {
             if app.cursor_position > 0 {
-                app.cursor_position -= 1;
-                app.input.remove(app.cursor_position);
+                let graphemes = app.input.graphemes(true).collect::<Vec<&str>>();
+                let byte_pos: usize = graphemes.iter().take(app.cursor_position - 1).map(|s| s.len()).sum();
+                let char_len = graphemes[app.cursor_position - 1].len();
+                app.input.replace_range(byte_pos..byte_pos + char_len, "");
+                app.cursor_position = clamp_cursor(app.cursor_position - 1, &app.input);
             }
         }
         KeyCode::Delete => {
-            if app.cursor_position < app.input.len() {
-                app.input.remove(app.cursor_position);
+            let graphemes = app.input.graphemes(true).collect::<Vec<&str>>();
+            if app.cursor_position < graphemes.len() {
+                let byte_pos: usize = graphemes.iter().take(app.cursor_position).map(|s| s.len()).sum();
+                let char_len = graphemes[app.cursor_position].len();
+                app.input.replace_range(byte_pos..byte_pos + char_len, "");
             }
         }
         KeyCode::Left => {
@@ -179,7 +192,7 @@ fn handle_confirm_delete_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
 }
 
 fn clamp_cursor(new_cursor_pos: usize, input: &str) -> usize {
-    new_cursor_pos.clamp(0, input.len())
+    new_cursor_pos.clamp(0, input.graphemes(true).count())
 }
 
 fn handle_mouse(mouse: MouseEvent, app: &mut App) -> InputResult {

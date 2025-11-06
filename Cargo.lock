@@ -483,6 +483,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "shellexpand",
+ "unicode-segmentation",
  "uuid",
 ]
 
