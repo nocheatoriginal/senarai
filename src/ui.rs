@@ -88,7 +88,7 @@ fn draw_main(f: &mut Frame, area: Rect, app: &mut App) {
         let list = List::new(items)
             .block(
                 Block::default()
-                    .title(status.to_string())
+                    .title(format!("{} ({})", status.to_string(), entry_in_status.len()))
                     .borders(Borders::ALL)
                     .border_style(Style::default().fg(consts::BORDER_COLOR))
                     .title_style(Style::default().fg(consts::TITLE_COLOR)),
