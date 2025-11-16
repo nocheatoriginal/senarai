@@ -136,13 +136,33 @@ fn handle_input_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
         }
         KeyCode::Char(c) => {
             let graphemes = app.input.graphemes(true).collect::<Vec<&str>>();
+
+            let should_capitalize = if c.is_alphabetic() {
+                if app.cursor_position == 0 {
+                    true
+                } else {
+                    graphemes
+                        .get(app.cursor_position - 1)
+                        .map_or(false, |&g| g.chars().all(char::is_whitespace))
+                }
+            } else {
+                false
+            };
+
+            let char_to_insert = if should_capitalize {
+                c.to_uppercase().to_string()
+            } else {
+                c.to_string()
+            };
+
             let byte_pos = if app.cursor_position >= graphemes.len() {
                 app.input.len()
             } else {
                 graphemes.iter().take(app.cursor_position).map(|s| s.len()).sum()
             };
-            app.input.insert(byte_pos, c);
-            app.cursor_position = clamp_cursor(app.cursor_position + 1, &app.input);
+            app.input.insert_str(byte_pos, &char_to_insert);
+            app.cursor_position =
+                clamp_cursor(app.cursor_position + char_to_insert.graphemes(true).count(), &app.input);
         }
         KeyCode::Backspace => {
             if app.cursor_position > 0 {
