@@ -5,7 +5,7 @@ pub fn draw_ui(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(match app.input_mode {
-            InputMode::Normal | InputMode::ConfirmDelete => {
+            InputMode::Normal | InputMode::ConfirmDelete | InputMode::Dropped => {
                 [Constraint::Min(0), Constraint::Length(1)].as_ref()
             }
             InputMode::Adding | InputMode::Editing => [
@@ -27,6 +27,10 @@ pub fn draw_ui(f: &mut Frame, app: &mut App) {
 
     if app.show_help {
         draw_help(f, &app.config.storage_path);
+    }
+
+    if app.show_dropped {
+        draw_dropped_popup(f, app);
     }
 
     draw_title_popup(f, app);
@@ -132,7 +136,7 @@ fn draw_input(f: &mut Frame, area: Rect, app: &mut App) {
 }
 
 fn draw_footer(f: &mut Frame, area: Rect) {
-    let text = "q: quit | a: add | e: edit | h: help | up/down: select | left/right: navigate";
+    let text = "q: quit | a: add | e: edit | h: help | d: dropped | up/down: select | left/right: navigate";
     let text_width = text.len() as u16;
     let text = if text_width > area.width {
         let mut truncated_text = text
@@ -207,6 +211,7 @@ fn draw_help(f: &mut Frame, storage_path: &str) {
 fn get_help_text_left() -> String {
     "a: add new entry
     e: edit entry
+    d: show dropped
 
     +: increase episode
     -: decrease episode
@@ -264,6 +269,7 @@ fn draw_title_popup(f: &mut Frame, app: &App) {
             Status::Planning => 0,
             Status::Watching => 1,
             Status::Completed => 2,
+            Status::Dropped => return,
         };
 
         if app.column_layout.is_empty() {
@@ -351,14 +357,21 @@ fn draw_error_popup(f: &mut Frame, app: &mut App) {
     }
 }
 
-fn draw_confirmation_popup(f: &mut Frame, _app: &App) {
+fn draw_confirmation_popup(f: &mut Frame, app: &App) {
     let area = centered_rect(
         consts::CONFIRMATION_POPUP_WIDTH,
         consts::CONFIRMATION_POPUP_HEIGHT,
         f.size(),
     );
+
+    let (title, message) = if app.show_dropped {
+        ("Confirm Deletion", "Are you sure you want to delete this entry? (y/n)")
+    } else {
+        ("Confirm Drop", "Are you sure you want to drop this entry? (y/n)")
+    };
+
     let block = Block::default()
-        .title("Confirm Deletion")
+        .title(title)
         .borders(Borders::ALL)
         .border_style(Style::default().fg(consts::BORDER_COLOR))
         .title_style(Style::default().fg(consts::TITLE_COLOR))
@@ -373,12 +386,137 @@ fn draw_confirmation_popup(f: &mut Frame, _app: &App) {
         .constraints([Constraint::Min(0), Constraint::Length(1)].as_ref())
         .split(block.inner(area));
 
-    let message = "Are you sure you want to delete this entry? (y/n)";
     let paragraph = Paragraph::new(message)
         .style(Style::default().fg(consts::TEXT_COLOR))
         .alignment(Alignment::Center);
 
     f.render_widget(paragraph, chunks[0]);
+}
+
+fn draw_dropped_popup(f: &mut Frame, app: &mut App) {
+    let area = f.size();
+
+    let block = Block::default()
+        .title(format!("Dropped Entries ({})", app.get_dropped_entries().len()))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(consts::BORDER_COLOR))
+        .title_style(Style::default().fg(consts::TITLE_COLOR));
+
+    f.render_widget(Clear, area);
+    let inner_area = block.inner(area);
+    f.render_widget(block, area);
+
+    let chunks = Layout::default()
+        .margin(1)
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(1)].as_ref())
+        .split(inner_area);
+
+    app.dropped_is_two_column = chunks[0].width > 80;
+    let dropped_entries = app.get_dropped_entries();
+
+    if app.dropped_is_two_column {
+        let columns = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(chunks[0]);
+
+        let mid_point = (dropped_entries.len() + 1) / 2;
+        let (left_entries, right_entries) = dropped_entries.split_at(mid_point);
+
+        for (i, entries) in [left_entries, right_entries].iter().enumerate() {
+            let items: Vec<ListItem> = entries
+                .iter()
+                .map(|(_, s)| {
+                    let col_width = columns[i].width as usize;
+                    let suffix = format!(" (S{} E{})", s.season, s.episode);
+                    let suffix_len = suffix.chars().count();
+                    let max_title_chars = if col_width > suffix_len + consts::PADDING {
+                        col_width - suffix_len - consts::PADDING
+                    } else {
+                        0
+                    };
+
+                    let title = if s.title.chars().count() > max_title_chars {
+                        let take = max_title_chars.saturating_sub(3);
+                        let mut truncated_title = s.title.chars().take(take).collect::<String>();
+                        truncated_title.push_str("...");
+                        truncated_title
+                    } else {
+                        s.title.clone()
+                    };
+                    ListItem::new(format!("{} (S{} E{})", title, s.season, s.episode))
+                        .style(Style::default().fg(consts::TEXT_COLOR))
+                })
+                .collect();
+
+            let list = List::new(items).highlight_style(
+                Style::default()
+                    .add_modifier(Modifier::BOLD)
+                    .bg(consts::HIGHLIGHT_BG)
+                    .fg(consts::HIGHLIGHT_FG),
+            );
+
+            let mut state = ListState::default();
+            if let Some(selected_in_col) = entries
+                .iter()
+                .position(|(idx, _)| *idx == app.selected_index)
+            {
+                state.select(Some(selected_in_col));
+            }
+
+            f.render_stateful_widget(list, columns[i], &mut state);
+        }
+    } else {
+        let items: Vec<ListItem> = dropped_entries
+            .iter()
+            .map(|(_, s)| {
+                let col_width = chunks[0].width as usize;
+                let suffix = format!(" (S{} E{})", s.season, s.episode);
+                let suffix_len = suffix.chars().count();
+                let max_title_chars = if col_width > suffix_len + consts::PADDING {
+                    col_width - suffix_len - consts::PADDING
+                } else {
+                    0
+                };
+
+                let title = if s.title.chars().count() > max_title_chars {
+                    let take = max_title_chars.saturating_sub(3);
+                    let mut truncated_title = s.title.chars().take(take).collect::<String>();
+                    truncated_title.push_str("...");
+                    truncated_title
+                } else {
+                    s.title.clone()
+                };
+                ListItem::new(format!("{} (S{} E{})", title, s.season, s.episode))
+                    .style(Style::default().fg(consts::TEXT_COLOR))
+            })
+            .collect();
+
+        let list = List::new(items).highlight_style(
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .bg(consts::HIGHLIGHT_BG)
+                .fg(consts::HIGHLIGHT_FG),
+        );
+
+        let mut state = ListState::default();
+        if let Some(selected_in_dropped) = dropped_entries
+            .iter()
+            .position(|(idx, _)| *idx == app.selected_index)
+        {
+            state.select(Some(selected_in_dropped));
+        }
+
+        f.render_stateful_widget(list, chunks[0], &mut state);
+    }
+
+    let help_text = "r: reactivate | x: delete | (esc: close)";
+    let paragraph = Paragraph::new(help_text)
+        .style(Style::default().fg(consts::FOOTER_TEXT_COLOR))
+        .alignment(Alignment::Center);
+
+    f.render_widget(paragraph, chunks[1]);
 }
 
 pub fn get_mouse_selection(app: &mut App) -> Option<usize> {

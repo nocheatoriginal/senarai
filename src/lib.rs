@@ -6,6 +6,7 @@ pub enum Status {
     Planning,
     Watching,
     Completed,
+    Dropped,
 }
 
 impl Status {
@@ -14,6 +15,7 @@ impl Status {
             Status::Planning => Status::Watching,
             Status::Watching => Status::Completed,
             Status::Completed => Status::Planning,
+            Status::Dropped => Status::Dropped,
         }
     }
 
@@ -22,6 +24,7 @@ impl Status {
             Status::Planning => Status::Completed,
             Status::Watching => Status::Planning,
             Status::Completed => Status::Watching,
+            Status::Dropped => Status::Dropped,
         }
     }
 }
@@ -32,6 +35,19 @@ impl ToString for Status {
             Status::Planning => "Planning".to_string(),
             Status::Watching => "Watching".to_string(),
             Status::Completed => "Completed".to_string(),
+            Status::Dropped => "Dropped".to_string(),
+        }
+    }
+}
+
+impl From<String> for Status {
+    fn from(s: String) -> Self {
+        match s.as_str() {
+            "Planning" => Status::Planning,
+            "Watching" => Status::Watching,
+            "Completed" => Status::Completed,
+            "Dropped" => Status::Dropped,
+            _ => Status::Planning,
         }
     }
 }

@@ -35,6 +35,7 @@ fn handle_key(key: KeyEvent, app: &mut App) -> InputResult {
         InputMode::Normal => handle_normal_mode_key(key, app),
         InputMode::Adding | InputMode::Editing => handle_input_mode_key(key, app),
         InputMode::ConfirmDelete => handle_confirm_delete_mode_key(key, app),
+        InputMode::Dropped => handle_dropped_mode_key(key, app),
     }
 }
 
@@ -96,6 +97,10 @@ fn handle_normal_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
         }
         KeyCode::Char('t') => {
             app.show_full_title = !app.show_full_title;
+        }
+        KeyCode::Char('d') => {
+            app.show_dropped = true;
+            app.input_mode = InputMode::Dropped;
         }
         KeyCode::Char('+') => {
             app.next_episode();
@@ -199,7 +204,11 @@ fn handle_input_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
 fn handle_confirm_delete_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
     match key.code {
         KeyCode::Char('y') | KeyCode::Char('Y') => {
-            app.remove_entry();
+            if app.show_dropped {
+                app.force_remove_entry();
+            } else {
+                app.drop_entry();
+            }
             app.input_mode = InputMode::Normal;
             InputResult::Modified
         }
@@ -209,6 +218,76 @@ fn handle_confirm_delete_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
         }
         _ => InputResult::Success,
     }
+}
+
+fn handle_dropped_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
+    let dropped_entries = app.get_dropped_entries();
+    if dropped_entries.is_empty() {
+        if key.code == KeyCode::Esc {
+            app.show_dropped = false;
+            app.input_mode = InputMode::Normal;
+        }
+        return InputResult::Success;
+    }
+
+    let current_pos = dropped_entries
+        .iter()
+        .position(|(idx, _)| *idx == app.selected_index);
+
+    match key.code {
+        KeyCode::Char('r') => {
+            app.reactivate_entry();
+            return InputResult::Modified;
+        }
+        KeyCode::Char('x') => {
+            app.input_mode = InputMode::ConfirmDelete;
+            return InputResult::Success;
+        }
+        KeyCode::Up => {
+            if let Some(pos) = current_pos {
+                if pos > 0 {
+                    app.selected_index = dropped_entries[pos - 1].0;
+                }
+            } else {
+                app.selected_index = dropped_entries[0].0;
+            }
+        }
+        KeyCode::Down => {
+            if let Some(pos) = current_pos {
+                if pos < dropped_entries.len() - 1 {
+                    app.selected_index = dropped_entries[pos + 1].0;
+                }
+            } else {
+                app.selected_index = dropped_entries[0].0;
+            }
+        }
+        KeyCode::Left | KeyCode::Right => {
+            if app.dropped_is_two_column {
+                if let Some(pos) = current_pos {
+                    let mid_point = (dropped_entries.len() + 1) / 2;
+                    let is_left = pos < mid_point;
+
+                    let target_pos = if is_left {
+                        // Move to right column
+                        pos + mid_point
+                    } else {
+                        // Move to left column
+                        pos - mid_point
+                    };
+
+                    if target_pos < dropped_entries.len() {
+                        app.selected_index = dropped_entries[target_pos].0;
+                    }
+                }
+            }
+        }
+        KeyCode::Esc | KeyCode::Char('d') => {
+            app.show_dropped = false;
+            app.input_mode = InputMode::Normal;
+        }
+        _ => {}
+    }
+    InputResult::Success
 }
 
 fn clamp_cursor(new_cursor_pos: usize, input: &str) -> usize {

@@ -8,6 +8,7 @@ pub enum InputMode {
     Editing,
     Adding,
     ConfirmDelete,
+    Dropped,
 }
 
 pub struct App {
@@ -22,6 +23,8 @@ pub struct App {
     pub input_mode: InputMode,
     pub show_help: bool,
     pub show_full_title: bool,
+    pub show_dropped: bool,
+    pub dropped_is_two_column: bool,
     pub config: Config,
     pub error: Option<String>,
     pub last_error_time: Option<Instant>,
@@ -41,6 +44,8 @@ impl App {
             input_mode: InputMode::Normal,
             show_help: false,
             show_full_title: false,
+            show_dropped: false,
+            dropped_is_two_column: false,
             config,
             error: None,
             last_error_time: None,
@@ -173,11 +178,19 @@ impl App {
         }
     }
 
-    fn get_entries_by_status(&self, status: Status) -> Vec<(usize, &Entry)> {
+    pub fn get_entries_by_status(&self, status: Status) -> Vec<(usize, &Entry)> {
         self.entry
             .iter()
             .enumerate()
             .filter(|(_, entry)| entry.status == status)
+            .collect()
+    }
+
+    pub fn get_dropped_entries(&self) -> Vec<(usize, &Entry)> {
+        self.entry
+            .iter()
+            .enumerate()
+            .filter(|(_, entry)| entry.status == Status::Dropped)
             .collect()
     }
 
@@ -233,7 +246,8 @@ impl App {
                 for _ in 0..3 {
                     let entries_in_prev_status = self.get_entries_by_status(prev_status);
                     if !entries_in_prev_status.is_empty() {
-                        self.selected_index = entries_in_prev_status[entries_in_prev_status.len() - 1].0;
+                        self.selected_index =
+                            entries_in_prev_status[entries_in_prev_status.len() - 1].0;
                         return;
                     }
                     prev_status = prev_status.prev();
@@ -245,21 +259,76 @@ impl App {
         }
     }
 
-    pub fn remove_entry(&mut self) {
+    pub fn drop_entry(&mut self) {
+        if let Some(entry) = self.entry.get_mut(self.selected_index) {
+            entry.status = Status::Dropped;
+            match database::update_entry(entry, &self.config) {
+                Ok(_) => {
+                    self.select_next_or_prev();
+                }
+                Err(e) => {
+                    self.error = Some(format!("Failed to drop entry in database: {}", e));
+                    self.last_error_time = Some(Instant::now());
+                }
+            }
+        }
+    }
+
+    pub fn force_remove_entry(&mut self) {
         if !self.entry.is_empty() {
             let entry_id = self.entry[self.selected_index].id;
             match database::delete_entry(&entry_id, &self.config) {
                 Ok(_) => {
                     self.entry.remove(self.selected_index);
-                    if self.selected_index >= self.entry.len() && self.selected_index > 0 {
-                        self.selected_index -= 1;
-                    }
+                    self.select_next_or_prev();
                 }
                 Err(e) => {
                     self.error = Some(format!("Failed to delete entry from database: {}", e));
                     self.last_error_time = Some(Instant::now());
                 }
             }
+        }
+    }
+
+    pub fn reactivate_entry(&mut self) {
+        if let Some(entry) = self.entry.get_mut(self.selected_index) {
+            entry.status = Status::Planning;
+            match database::update_entry(entry, &self.config) {
+                Ok(_) => {
+                    self.select_next_or_prev();
+                }
+                Err(e) => {
+                    self.error = Some(format!("Failed to reactivate entry in database: {}", e));
+                    self.last_error_time = Some(Instant::now());
+                }
+            }
+        }
+    }
+
+    fn select_next_or_prev(&mut self) {
+        let entries = if self.show_dropped {
+            self.get_dropped_entries()
+        } else {
+            self.entry
+                .iter()
+                .enumerate()
+                .filter(|(_, e)| e.status != Status::Dropped)
+                .collect()
+        };
+
+        if entries.is_empty() {
+            self.selected_index = self
+                .entry
+                .iter()
+                .position(|e| e.status != Status::Dropped)
+                .unwrap_or(0);
+            return;
+        }
+
+        if self.selected_index >= entries.len() {
+            self.selected_index = entries[entries.len() - 1].0;
+        } else {
+            self.selected_index = entries[self.selected_index].0;
         }
     }
 

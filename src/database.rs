@@ -11,12 +11,7 @@ pub fn load_entry(config: &Config) -> Result<Vec<Entry>> {
     let mut stmt = conn.prepare("SELECT id, title, status, season, episode FROM entries")?;
     let entries_iter = stmt.query_map([], |row| {
         let status_str: String = row.get(2)?;
-        let status = match status_str.as_str() {
-            "Planning" => Status::Planning,
-            "Watching" => Status::Watching,
-            "Completed" => Status::Completed,
-            _ => Status::Planning,
-        };
+        let status = Status::from(status_str);
         Ok(Entry {
             id: Uuid::parse_str(&row.get::<_, String>(0)?).map_err(|_e| {
                 rusqlite::Error::InvalidColumnType(0, "uuid".to_string(), Type::Text)

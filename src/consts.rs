@@ -19,6 +19,8 @@ pub const TITLE_POPUP_WIDTH: u16 = 60;
 pub const TITLE_POPUP_HEIGHT: u16 = 10;
 pub const CONFIRMATION_POPUP_WIDTH: u16 = 50;
 pub const CONFIRMATION_POPUP_HEIGHT: u16 = 20;
+pub const DROPPED_POPUP_WIDTH: u16 = 80;
+pub const DROPPED_POPUP_HEIGHT: u16 = 50;
 
 pub const PADDING: usize = 2;
 
