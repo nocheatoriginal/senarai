@@ -3,12 +3,14 @@ use ratatui::layout::Rect;
 use std::time::Instant;
 use uuid::Uuid;
 
+#[derive(PartialEq)]
 pub enum InputMode {
     Normal,
     Editing,
     Adding,
     ConfirmDelete,
     Dropped,
+    ConfirmDeleteAllDropped,
 }
 
 pub struct App {
@@ -18,6 +20,7 @@ pub struct App {
     pub dragged_entry: Option<(usize, Status)>,
     pub layout: Vec<Rect>,
     pub column_layout: Vec<Rect>,
+    pub dropped_column_layout: Vec<Rect>,
     pub input: String,
     pub cursor_position: usize,
     pub input_mode: InputMode,
@@ -39,6 +42,7 @@ impl App {
             dragged_entry: None,
             layout: Vec::new(),
             column_layout: Vec::new(),
+            dropped_column_layout: Vec::new(),
             input: String::new(),
             cursor_position: 0,
             input_mode: InputMode::Normal,
@@ -186,11 +190,12 @@ impl App {
             .collect()
     }
 
-    pub fn get_dropped_entries(&self) -> Vec<(usize, &Entry)> {
+    pub fn get_dropped_entries(&self) -> Vec<(usize, Entry)> {
         self.entry
             .iter()
             .enumerate()
             .filter(|(_, entry)| entry.status == Status::Dropped)
+            .map(|(i, e)| (i, e.clone()))
             .collect()
     }
 
@@ -306,13 +311,17 @@ impl App {
     }
 
     fn select_next_or_prev(&mut self) {
-        let entries = if self.show_dropped {
+        let entries: Vec<_> = if self.show_dropped {
             self.get_dropped_entries()
+                .iter()
+                .map(|(i, e)| (*i, e.clone()))
+                .collect()
         } else {
             self.entry
                 .iter()
                 .enumerate()
                 .filter(|(_, e)| e.status != Status::Dropped)
+                .map(|(i, e)| (i, e.clone()))
                 .collect()
         };
 
@@ -413,6 +422,49 @@ impl App {
                         self.last_error_time = Some(Instant::now());
                     }
                 }
+            }
+        }
+    }
+
+    pub fn force_remove_all_dropped_entries(&mut self) {
+        let dropped_entries_indices: Vec<usize> = self
+            .entry
+            .iter()
+            .enumerate()
+            .filter(|(_, entry)| entry.status == Status::Dropped)
+            .map(|(index, _)| index)
+            .collect();
+
+        if dropped_entries_indices.is_empty() {
+            return;
+        }
+
+        let dropped_entry_ids: Vec<Uuid> = dropped_entries_indices
+            .iter()
+            .map(|&index| self.entry[index].id)
+            .collect();
+
+        match database::delete_entries(&dropped_entry_ids, &self.config) {
+            Ok(_) => {
+                let original_len = self.entry.len();
+                self.entry
+                    .retain(|entry| entry.status != Status::Dropped);
+                let removed_count = original_len - self.entry.len();
+
+                if removed_count > 0 {
+                    if !self.entry.is_empty() {
+                        self.selected_index = 0;
+                    } else {
+                        self.selected_index = 0;
+                    }
+                }
+            }
+            Err(e) => {
+                self.error = Some(format!(
+                    "Failed to delete entries from database: {}",
+                    e
+                ));
+                self.last_error_time = Some(Instant::now());
             }
         }
     }

@@ -35,6 +35,7 @@ fn handle_key(key: KeyEvent, app: &mut App) -> InputResult {
         InputMode::Normal => handle_normal_mode_key(key, app),
         InputMode::Adding | InputMode::Editing => handle_input_mode_key(key, app),
         InputMode::ConfirmDelete => handle_confirm_delete_mode_key(key, app),
+        InputMode::ConfirmDeleteAllDropped => handle_confirm_delete_mode_key(key, app),
         InputMode::Dropped => handle_dropped_mode_key(key, app),
     }
 }
@@ -101,6 +102,10 @@ fn handle_normal_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
         KeyCode::Char('d') => {
             app.show_dropped = true;
             app.input_mode = InputMode::Dropped;
+            let dropped_entries = app.get_dropped_entries();
+            if !dropped_entries.is_empty() {
+                app.selected_index = dropped_entries[0].0;
+            }
         }
         KeyCode::Char('+') => {
             app.next_episode();
@@ -204,10 +209,18 @@ fn handle_input_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
 fn handle_confirm_delete_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
     match key.code {
         KeyCode::Char('y') | KeyCode::Char('Y') => {
-            if app.show_dropped {
-                app.force_remove_entry();
-            } else {
-                app.drop_entry();
+            match app.input_mode {
+                InputMode::ConfirmDelete => {
+                    if app.show_dropped {
+                        app.force_remove_entry();
+                    } else {
+                        app.drop_entry();
+                    }
+                }
+                InputMode::ConfirmDeleteAllDropped => {
+                    app.force_remove_all_dropped_entries();
+                }
+                _ => {}
             }
             app.input_mode = InputMode::Normal;
             InputResult::Modified
@@ -243,12 +256,21 @@ fn handle_dropped_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
             app.input_mode = InputMode::ConfirmDelete;
             return InputResult::Success;
         }
+        KeyCode::Char('t') => {
+            app.show_full_title = !app.show_full_title;
+        }
+        KeyCode::Char('X') => {
+            if key.modifiers.contains(KeyModifiers::SHIFT) {
+                app.input_mode = InputMode::ConfirmDeleteAllDropped;
+                return InputResult::Success;
+            }
+        }
         KeyCode::Up => {
             if let Some(pos) = current_pos {
                 if pos > 0 {
                     app.selected_index = dropped_entries[pos - 1].0;
                 }
-            } else {
+            } else if !dropped_entries.is_empty() {
                 app.selected_index = dropped_entries[0].0;
             }
         }
@@ -257,7 +279,7 @@ fn handle_dropped_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
                 if pos < dropped_entries.len() - 1 {
                     app.selected_index = dropped_entries[pos + 1].0;
                 }
-            } else {
+            } else if !dropped_entries.is_empty() {
                 app.selected_index = dropped_entries[0].0;
             }
         }
@@ -281,7 +303,7 @@ fn handle_dropped_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
                 }
             }
         }
-        KeyCode::Esc | KeyCode::Char('d') => {
+        KeyCode::Esc => {
             app.show_dropped = false;
             app.input_mode = InputMode::Normal;
         }
@@ -312,7 +334,12 @@ fn handle_mouse(mouse: MouseEvent, app: &mut App) -> InputResult {
                 }
             }
 
-            if !app.column_layout.is_empty() {
+            if app.input_mode == InputMode::Dropped {
+                if let Some(selected_index) = crate::ui::get_dropped_mouse_selection(app) {
+                    app.selected_index = selected_index;
+                    return InputResult::Modified;
+                }
+            } else if !app.column_layout.is_empty() {
                 let col = app.column_layout.iter().position(|&r| {
                     mouse.column >= r.x
                         && mouse.column < r.x + r.width

@@ -1,11 +1,11 @@
-use crate::{app::App, app::InputMode, consts, Status};
+use crate::{app::App, app::InputMode, consts, Status, Entry};
 use ratatui::{prelude::*, widgets::*};
 
 pub fn draw_ui(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(match app.input_mode {
-            InputMode::Normal | InputMode::ConfirmDelete | InputMode::Dropped => {
+            InputMode::Normal | InputMode::ConfirmDelete | InputMode::Dropped | InputMode::ConfirmDeleteAllDropped => {
                 [Constraint::Min(0), Constraint::Length(1)].as_ref()
             }
             InputMode::Adding | InputMode::Editing => [
@@ -36,7 +36,7 @@ pub fn draw_ui(f: &mut Frame, app: &mut App) {
     draw_title_popup(f, app);
     draw_error_popup(f, app);
 
-    if let InputMode::ConfirmDelete = app.input_mode {
+    if let InputMode::ConfirmDelete | InputMode::ConfirmDeleteAllDropped = app.input_mode {
         draw_confirmation_popup(f, app);
     }
 }
@@ -364,10 +364,18 @@ fn draw_confirmation_popup(f: &mut Frame, app: &App) {
         f.size(),
     );
 
-    let (title, message) = if app.show_dropped {
-        ("Confirm Deletion", "Are you sure you want to delete this entry? (y/n)")
-    } else {
-        ("Confirm Drop", "Are you sure you want to drop this entry? (y/n)")
+    let (title, message) = match app.input_mode {
+        InputMode::ConfirmDelete => {
+            if app.show_dropped {
+                ("Confirm Deletion", "Are you sure you want to delete this entry? (y/n)")
+            } else {
+                ("Confirm Drop", "Are you sure you want to drop this entry? (y/n)")
+            }
+        }
+        InputMode::ConfirmDeleteAllDropped => {
+            ("Confirm Deletion", "Are you sure you want to delete ALL dropped entries? (y/n)")
+        }
+        _ => return, // Should not happen
     };
 
     let block = Block::default()
@@ -395,9 +403,10 @@ fn draw_confirmation_popup(f: &mut Frame, app: &App) {
 
 fn draw_dropped_popup(f: &mut Frame, app: &mut App) {
     let area = f.size();
+    let dropped_entries = app.get_dropped_entries();
 
     let block = Block::default()
-        .title(format!("Dropped Entries ({})", app.get_dropped_entries().len()))
+        .title(format!("Dropped Entries ({})", dropped_entries.len()))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(consts::BORDER_COLOR))
         .title_style(Style::default().fg(consts::TITLE_COLOR));
@@ -412,14 +421,15 @@ fn draw_dropped_popup(f: &mut Frame, app: &mut App) {
         .constraints([Constraint::Min(0), Constraint::Length(1)].as_ref())
         .split(inner_area);
 
-    app.dropped_is_two_column = chunks[0].width > 80;
-    let dropped_entries = app.get_dropped_entries();
+    let dropped_is_two_column = chunks[0].width > 80;
+    app.dropped_is_two_column = dropped_is_two_column;
 
-    if app.dropped_is_two_column {
+    if dropped_is_two_column {
         let columns = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(chunks[0]);
+        app.dropped_column_layout = columns.to_vec();
 
         let mid_point = (dropped_entries.len() + 1) / 2;
         let (left_entries, right_entries) = dropped_entries.split_at(mid_point);
@@ -468,6 +478,7 @@ fn draw_dropped_popup(f: &mut Frame, app: &mut App) {
             f.render_stateful_widget(list, columns[i], &mut state);
         }
     } else {
+        app.dropped_column_layout = vec![chunks[0]];
         let items: Vec<ListItem> = dropped_entries
             .iter()
             .map(|(_, s)| {
@@ -540,6 +551,42 @@ pub fn get_mouse_selection(app: &mut App) -> Option<usize> {
             if mouse_y >= list_start_y {
                 let selected_line = (mouse_y - list_start_y) as usize;
                 if let Some((original_index, _)) = entry_in_status.get(selected_line) {
+                    return Some(*original_index);
+                }
+            }
+        }
+    }
+    None
+}
+
+pub fn get_dropped_mouse_selection(app: &mut App) -> Option<usize> {
+    let mouse_x = app.mouse_pos.0;
+    let mouse_y = app.mouse_pos.1;
+
+    let dropped_entries = app.get_dropped_entries();
+
+    if app.dropped_column_layout.is_empty() {
+        return None;
+    }
+
+    for (col_idx, col_rect) in app.dropped_column_layout.iter().enumerate() {
+        if mouse_x >= col_rect.x && mouse_x < col_rect.x + col_rect.width {
+            let list_start_y = col_rect.y + 1;
+            if mouse_y >= list_start_y {
+                let selected_line = (mouse_y - list_start_y) as usize;
+
+                let entries_in_col: Vec<(usize, Entry)> = if app.dropped_is_two_column {
+                    let mid_point = (dropped_entries.len() + 1) / 2;
+                    if col_idx == 0 {
+                        dropped_entries[..mid_point].to_vec()
+                    } else {
+                        dropped_entries[mid_point..].to_vec()
+                    }
+                } else {
+                    dropped_entries.clone()
+                };
+
+                if let Some((original_index, _)) = entries_in_col.get(selected_line) {
                     return Some(*original_index);
                 }
             }

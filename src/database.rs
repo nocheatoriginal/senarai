@@ -79,6 +79,19 @@ pub fn delete_entry(id: &Uuid, config: &Config) -> Result<()> {
     Ok(())
 }
 
+pub fn delete_entries(ids: &[Uuid], config: &Config) -> Result<()> {
+    let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
+    let mut conn = Connection::open(db_path)?;
+    let tx = conn.transaction()?;
+
+    for id in ids {
+        tx.execute("DELETE FROM entries WHERE id = ?1", [id.to_string()])?;
+    }
+
+    tx.commit()?;
+    Ok(())
+}
+
 pub fn init_db(config: &Config) -> Result<()> {
     let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
 
