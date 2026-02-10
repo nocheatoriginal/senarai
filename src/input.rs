@@ -235,11 +235,27 @@ fn handle_confirm_delete_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
 
 fn handle_dropped_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
     let dropped_entries = app.get_dropped_entries();
-    if dropped_entries.is_empty() {
-        if key.code == KeyCode::Esc {
+
+    match key.code {
+        KeyCode::Char('q') => return InputResult::Quit,
+        KeyCode::Char('h') => {
+            app.show_help = !app.show_help;
+            return InputResult::Success;
+        }
+        KeyCode::Esc => {
             app.show_dropped = false;
             app.input_mode = InputMode::Normal;
+            app.select_first_entry_in_normal_view();
+            return InputResult::Success;
         }
+        KeyCode::Char('t') => {
+            app.show_full_title = !app.show_full_title;
+            return InputResult::Success;
+        }
+        _ => {}
+    }
+
+    if dropped_entries.is_empty() {
         return InputResult::Success;
     }
 
@@ -255,9 +271,6 @@ fn handle_dropped_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
         KeyCode::Char('x') => {
             app.input_mode = InputMode::ConfirmDelete;
             return InputResult::Success;
-        }
-        KeyCode::Char('t') => {
-            app.show_full_title = !app.show_full_title;
         }
         KeyCode::Char('X') => {
             if key.modifiers.contains(KeyModifiers::SHIFT) {
@@ -290,10 +303,8 @@ fn handle_dropped_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
                     let is_left = pos < mid_point;
 
                     let target_pos = if is_left {
-                        // Move to right column
                         pos + mid_point
                     } else {
-                        // Move to left column
                         pos - mid_point
                     };
 
@@ -302,10 +313,6 @@ fn handle_dropped_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
                     }
                 }
             }
-        }
-        KeyCode::Esc => {
-            app.show_dropped = false;
-            app.input_mode = InputMode::Normal;
         }
         _ => {}
     }

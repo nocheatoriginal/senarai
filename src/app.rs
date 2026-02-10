@@ -35,7 +35,7 @@ pub struct App {
 
 impl App {
     pub fn new(entry: Vec<Entry>, config: Config) -> Self {
-        Self {
+        let mut app = Self {
             entry,
             selected_index: 0,
             mouse_pos: (0, 0),
@@ -53,7 +53,9 @@ impl App {
             config,
             error: None,
             last_error_time: None,
-        }
+        };
+        app.select_first_entry_in_normal_view();
+        app
     }
 
     pub fn add_entry(&mut self, title: String) {
@@ -466,6 +468,22 @@ impl App {
                 ));
                 self.last_error_time = Some(Instant::now());
             }
+        }
+    }
+
+    pub fn select_first_entry_in_normal_view(&mut self) {
+        self.selected_index = 0; // Default to 0 if no entry is found
+
+        let planning_entries = self.get_entries_by_status(Status::Planning);
+        let watching_entries = self.get_entries_by_status(Status::Watching);
+        let completed_entries = self.get_entries_by_status(Status::Completed);
+
+        if let Some((idx, _)) = planning_entries.first() {
+            self.selected_index = *idx;
+        } else if let Some((idx, _)) = watching_entries.first() {
+            self.selected_index = *idx;
+        } else if let Some((idx, _)) = completed_entries.first() {
+            self.selected_index = *idx;
         }
     }
 }
