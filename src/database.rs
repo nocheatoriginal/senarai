@@ -145,13 +145,5 @@ pub fn init_db(config: &Config) -> Result<()> {
 
     add_watched_episodes_column_if_not_exists(&conn)?;
 
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS metadata (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL
-        )",
-        (),
-    )?;
-
     Ok(())
 }
