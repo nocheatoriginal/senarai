@@ -222,11 +222,19 @@ fn handle_confirm_delete_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
                 }
                 _ => {}
             }
-            app.input_mode = InputMode::Normal;
+            app.input_mode = if app.show_dropped {
+                InputMode::Dropped
+            } else {
+                InputMode::Normal
+            };
             InputResult::Modified
         }
         KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
-            app.input_mode = InputMode::Normal;
+            app.input_mode = if app.show_dropped {
+                InputMode::Dropped
+            } else {
+                InputMode::Normal
+            };
             InputResult::Success
         }
         _ => InputResult::Success,
