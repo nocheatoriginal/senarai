@@ -11,6 +11,7 @@ pub enum InputMode {
     ConfirmDelete,
     Dropped,
     ConfirmDeleteAllDropped,
+    TotalEpisodes,
 }
 
 pub struct App {
@@ -27,6 +28,7 @@ pub struct App {
     pub show_help: bool,
     pub show_full_title: bool,
     pub show_dropped: bool,
+    pub show_total_episodes_popup: bool,
     pub dropped_is_two_column: bool,
     pub config: Config,
     pub error: Option<String>,
@@ -49,6 +51,7 @@ impl App {
             show_help: false,
             show_full_title: false,
             show_dropped: false,
+            show_total_episodes_popup: false,
             dropped_is_two_column: false,
             config,
             error: None,
@@ -71,6 +74,7 @@ impl App {
                     season: 1,
                     episode: 0,
                     status: Status::Planning,
+                    watched_episodes: 0,
                 };
                 match database::add_entry(&new_entry, &self.config) {
                     Ok(_) => {
@@ -112,6 +116,7 @@ impl App {
     pub fn next_episode(&mut self) {
         if let Some(s) = self.entry.get_mut(self.selected_index) {
             s.episode += 1;
+            s.watched_episodes += 1;
             match database::update_entry(s, &self.config) {
                 Ok(_) => {}
                 Err(e) => {
@@ -126,6 +131,9 @@ impl App {
         if let Some(s) = self.entry.get_mut(self.selected_index) {
             if s.episode > 0 {
                 s.episode -= 1;
+                if s.watched_episodes > 0 {
+                    s.watched_episodes -= 1;
+                }
             } else if s.season > 1 {
                 s.season -= 1;
                 s.episode = 0;
@@ -135,6 +143,34 @@ impl App {
                 Err(e) => {
                     self.error = Some(format!("Failed to update entry in database: {}", e));
                     self.last_error_time = Some(Instant::now());
+                }
+            }
+        }
+    }
+
+    pub fn increment_watched_episodes(&mut self) {
+        if let Some(s) = self.entry.get_mut(self.selected_index) {
+            s.watched_episodes += 1;
+            match database::update_entry(s, &self.config) {
+                Ok(_) => {}
+                Err(e) => {
+                    self.error = Some(format!("Failed to save total episodes: {}", e));
+                    self.last_error_time = Some(Instant::now());
+                }
+            }
+        }
+    }
+
+    pub fn decrement_watched_episodes(&mut self) {
+        if let Some(s) = self.entry.get_mut(self.selected_index) {
+            if s.watched_episodes > 0 {
+                s.watched_episodes -= 1;
+                match database::update_entry(s, &self.config) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        self.error = Some(format!("Failed to save total episodes: {}", e));
+                        self.last_error_time = Some(Instant::now());
+                    }
                 }
             }
         }

@@ -59,6 +59,7 @@ pub struct Entry {
     pub season: u32,
     pub episode: u32,
     pub status: Status,
+    pub watched_episodes: u32,
 }
 
 pub mod app;

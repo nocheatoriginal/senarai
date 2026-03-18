@@ -37,7 +37,27 @@ fn handle_key(key: KeyEvent, app: &mut App) -> InputResult {
         InputMode::ConfirmDelete => handle_confirm_delete_mode_key(key, app),
         InputMode::ConfirmDeleteAllDropped => handle_confirm_delete_mode_key(key, app),
         InputMode::Dropped => handle_dropped_mode_key(key, app),
+        InputMode::TotalEpisodes => handle_total_episodes_mode_key(key, app),
     }
+}
+
+fn handle_total_episodes_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
+    match key.code {
+        KeyCode::Char('o') | KeyCode::Enter | KeyCode::Esc => {
+            app.show_total_episodes_popup = false;
+            app.input_mode = InputMode::Normal;
+        }
+        KeyCode::Char('+') => {
+            app.increment_watched_episodes();
+            return InputResult::Modified;
+        }
+        KeyCode::Char('-') => {
+            app.decrement_watched_episodes();
+            return InputResult::Modified;
+        }
+        _ => {}
+    }
+    InputResult::Success
 }
 
 fn handle_normal_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
@@ -98,6 +118,10 @@ fn handle_normal_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
         }
         KeyCode::Char('t') => {
             app.show_full_title = !app.show_full_title;
+        }
+        KeyCode::Char('o') => {
+            app.show_total_episodes_popup = true;
+            app.input_mode = InputMode::TotalEpisodes;
         }
         KeyCode::Char('d') => {
             app.show_dropped = true;
@@ -420,3 +444,4 @@ fn handle_mouse(mouse: MouseEvent, app: &mut App) -> InputResult {
     }
     InputResult::Success
 }
+

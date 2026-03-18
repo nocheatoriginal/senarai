@@ -4,11 +4,14 @@ use rusqlite::{Connection, Result};
 use std::path::Path;
 use uuid::Uuid;
 
+
+
 pub fn load_entry(config: &Config) -> Result<Vec<Entry>> {
     let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
     let conn = Connection::open(db_path)?;
 
-    let mut stmt = conn.prepare("SELECT id, title, status, season, episode FROM entries")?;
+    let mut stmt =
+        conn.prepare("SELECT id, title, status, season, episode, watched_episodes FROM entries")?;
     let entries_iter = stmt.query_map([], |row| {
         let status_str: String = row.get(2)?;
         let status = Status::from(status_str);
@@ -20,6 +23,7 @@ pub fn load_entry(config: &Config) -> Result<Vec<Entry>> {
             status,
             season: row.get(3)?,
             episode: row.get(4)?,
+            watched_episodes: row.get(5)?,
         })
     })?;
 
@@ -45,13 +49,14 @@ pub fn add_entry(entry: &Entry, config: &Config) -> Result<()> {
     let conn = Connection::open(db_path)?;
 
     conn.execute(
-        "INSERT INTO entries (id, title, status, season, episode) VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO entries (id, title, status, season, episode, watched_episodes) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         (
             &entry.id.to_string(),
             &entry.title,
             &entry.status.to_string(),
             &entry.season,
             &entry.episode,
+            &entry.watched_episodes,
         ),
     )?;
 
@@ -63,8 +68,8 @@ pub fn update_entry(entry: &Entry, config: &Config) -> Result<()> {
     let conn = Connection::open(db_path)?;
 
     conn.execute(
-        "INSERT OR REPLACE INTO entries (id, title, status, season, episode) VALUES (?1, ?2, ?3, ?4, ?5)",
-        (&entry.id.to_string(), &entry.title, &entry.status.to_string(), &entry.season, &entry.episode),
+        "INSERT OR REPLACE INTO entries (id, title, status, season, episode, watched_episodes) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        (&entry.id.to_string(), &entry.title, &entry.status.to_string(), &entry.season, &entry.episode, &entry.watched_episodes),
     )?;
 
     Ok(())
@@ -92,6 +97,24 @@ pub fn delete_entries(ids: &[Uuid], config: &Config) -> Result<()> {
     Ok(())
 }
 
+fn add_watched_episodes_column_if_not_exists(conn: &Connection) -> Result<()> {
+    let mut stmt = conn.prepare("PRAGMA table_info(entries)")?;
+    let column_exists = stmt
+        .query_map([], |row| row.get(1))?
+        .any(|col_name_result| {
+            col_name_result.map_or(false, |col_name: String| col_name == "watched_episodes")
+        });
+
+    if !column_exists {
+        conn.execute(
+            "ALTER TABLE entries ADD COLUMN watched_episodes INTEGER NOT NULL DEFAULT 0",
+            (),
+        )?;
+    }
+
+    Ok(())
+}
+
 pub fn init_db(config: &Config) -> Result<()> {
     let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
 
@@ -114,7 +137,18 @@ pub fn init_db(config: &Config) -> Result<()> {
             title TEXT NOT NULL,
             status TEXT NOT NULL,
             season INTEGER NOT NULL,
-            episode INTEGER NOT NULL
+            episode INTEGER NOT NULL,
+            watched_episodes INTEGER NOT NULL DEFAULT 0
+        )",
+        (),
+    )?;
+
+    add_watched_episodes_column_if_not_exists(&conn)?;
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
         )",
         (),
     )?;

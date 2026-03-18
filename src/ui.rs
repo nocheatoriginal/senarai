@@ -5,15 +5,14 @@ pub fn draw_ui(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(match app.input_mode {
-            InputMode::Normal | InputMode::ConfirmDelete | InputMode::Dropped | InputMode::ConfirmDeleteAllDropped => {
-                [Constraint::Min(0), Constraint::Length(1)].as_ref()
+            InputMode::Normal
+            | InputMode::ConfirmDelete
+            | InputMode::Dropped
+            | InputMode::ConfirmDeleteAllDropped
+            | InputMode::TotalEpisodes => [Constraint::Min(0), Constraint::Length(1)].as_ref(),
+            InputMode::Adding | InputMode::Editing => {
+                [Constraint::Min(0), Constraint::Length(3), Constraint::Length(1)].as_ref()
             }
-            InputMode::Adding | InputMode::Editing => [
-                Constraint::Min(0),
-                Constraint::Length(3),
-                Constraint::Length(1),
-            ]
-            .as_ref(),
         })
         .split(f.size());
 
@@ -31,6 +30,10 @@ pub fn draw_ui(f: &mut Frame, app: &mut App) {
 
     if app.show_dropped {
         draw_dropped_popup(f, app);
+    }
+
+    if app.show_total_episodes_popup {
+        draw_total_episodes_popup(f, app);
     }
 
     draw_title_popup(f, app);
@@ -212,6 +215,7 @@ fn get_help_text_left() -> String {
     "a: add new entry
     e: edit entry
     d: show dropped
+    o: total episodes
 
     +: increase episode
     -: decrease episode
@@ -257,6 +261,45 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
             Constraint::Percentage((100 - percent_x) / 2),
         ])
         .split(popup_layout[1])[1]
+}
+
+fn draw_total_episodes_popup(f: &mut Frame, app: &mut App) {
+    let area = centered_rect(30, 20, f.size()); // Adjust size as needed
+
+    let block = Block::default()
+        .title("Episodes Watched")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(consts::BORDER_COLOR))
+        .title_style(Style::default().fg(consts::TITLE_COLOR))
+        .padding(Padding::new(1, 1, 1, 1));
+
+    f.render_widget(Clear, area);
+    f.render_widget(block.clone(), area);
+
+    let chunks = Layout::default()
+        .margin(1)
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(1)].as_ref())
+        .split(block.inner(area));
+
+    let text = if let Some(entry) = app.entry.get(app.selected_index) {
+        format!("{}", entry.watched_episodes)
+    } else {
+        "N/A".to_string()
+    };
+
+    let paragraph = Paragraph::new(text)
+        .style(Style::default().fg(consts::TEXT_COLOR))
+        .alignment(Alignment::Center);
+
+    f.render_widget(paragraph, chunks[0]);
+
+    let help_text = "(o/enter: close, +/-: adjust)";
+    let help_paragraph = Paragraph::new(help_text)
+        .style(Style::default().fg(consts::FOOTER_TEXT_COLOR))
+        .alignment(Alignment::Center);
+
+    f.render_widget(help_paragraph, chunks[1]);
 }
 
 fn draw_title_popup(f: &mut Frame, app: &App) {
