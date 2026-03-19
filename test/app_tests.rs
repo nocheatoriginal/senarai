@@ -11,6 +11,7 @@ fn create_dummy_app() -> App {
             season: 1,
             episode: 1,
             status: Status::Watching,
+            watched_episodes: 0,
         },
         Entry {
             id: Uuid::parse_str("772d2d49-9ce7-4db7-bd33-8dfb93617af4").unwrap(),
@@ -18,6 +19,7 @@ fn create_dummy_app() -> App {
             season: 2,
             episode: 5,
             status: Status::Completed,
+            watched_episodes: 0,
         },
         Entry {
             id: Uuid::parse_str("2cd6538f-944b-429e-b840-98ec89ed49ef").unwrap(),
@@ -25,6 +27,7 @@ fn create_dummy_app() -> App {
             season: 1,
             episode: 0,
             status: Status::Planning,
+            watched_episodes: 0,
         },
     ];
     let config = Config {
