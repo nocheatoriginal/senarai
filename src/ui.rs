@@ -73,11 +73,19 @@ fn draw_main(f: &mut Frame, area: Rect, app: &mut App) {
                 let col_width = chunks[i].width as usize;
                 let suffix = format!(" (S{} E{})", s.season, s.episode);
                 let suffix_len = suffix.chars().count();
-                let max_title_chars = if col_width > suffix_len + consts::PADDING {
-                    col_width - suffix_len - consts::PADDING
-                } else {
-                    0
-                };
+
+                let mut prefix = String::new();
+                if s.status == Status::Planning && (s.season != 1 || s.episode != 0) {
+                    prefix.push_str("[P] ");
+                }
+                let prefix_len = prefix.chars().count();
+
+                let max_title_chars =
+                    if col_width > suffix_len + prefix_len + consts::PADDING {
+                        col_width - suffix_len - prefix_len - consts::PADDING
+                    } else {
+                        0
+                    };
 
                 let title = if s.title.chars().count() > max_title_chars {
                     let take = max_title_chars.saturating_sub(3);
@@ -87,8 +95,13 @@ fn draw_main(f: &mut Frame, area: Rect, app: &mut App) {
                 } else {
                     s.title.clone()
                 };
-                ListItem::new(format!("{} (S{} E{})", title, s.season, s.episode))
-                    .style(Style::default().fg(consts::TEXT_COLOR))
+                ListItem::new(format!(
+                    "{}{}{}",
+                    prefix,
+                    title,
+                    suffix
+                ))
+                .style(Style::default().fg(consts::TEXT_COLOR))
             })
             .collect();
 
