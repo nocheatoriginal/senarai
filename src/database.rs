@@ -4,14 +4,13 @@ use rusqlite::{Connection, Result};
 use std::path::Path;
 use uuid::Uuid;
 
-
-
 pub fn load_entry(config: &Config) -> Result<Vec<Entry>> {
     let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
     let conn = Connection::open(db_path)?;
 
-    let mut stmt =
-        conn.prepare("SELECT id, title, status, season, episode, watched_episodes FROM entries")?;
+    let mut stmt = conn.prepare(
+        "SELECT id, title, status, season, episode, watched_episodes FROM entries ORDER BY ordering ASC",
+    )?;
     let entries_iter = stmt.query_map([], |row| {
         let status_str: String = row.get(2)?;
         let status = Status::from(status_str);
@@ -34,22 +33,16 @@ pub fn load_entry(config: &Config) -> Result<Vec<Entry>> {
     Ok(entries)
 }
 
-pub fn entry_exists_by_title(title: &str, config: &Config) -> Result<bool> {
-    let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
-    let conn = Connection::open(db_path)?;
-
-    let mut stmt = conn.prepare("SELECT COUNT(*) FROM entries WHERE title = ?1")?;
-    let count: i64 = stmt.query_row([title], |row| row.get(0))?;
-
-    Ok(count > 0)
-}
-
 pub fn add_entry(entry: &Entry, config: &Config) -> Result<()> {
     let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
     let conn = Connection::open(db_path)?;
 
+    let max_ordering: i64 = conn.query_row("SELECT MAX(ordering) FROM entries", [], |row| {
+        row.get(0).or(Ok(0))
+    })?;
+
     conn.execute(
-        "INSERT INTO entries (id, title, status, season, episode, watched_episodes) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        "INSERT INTO entries (id, title, status, season, episode, watched_episodes, ordering) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         (
             &entry.id.to_string(),
             &entry.title,
@@ -57,21 +50,33 @@ pub fn add_entry(entry: &Entry, config: &Config) -> Result<()> {
             &entry.season,
             &entry.episode,
             &entry.watched_episodes,
+            max_ordering + 1,
         ),
     )?;
 
     Ok(())
 }
 
-pub fn update_entry(entry: &Entry, config: &Config) -> Result<()> {
+pub fn update_all_entries(entries: &[Entry], config: &Config) -> Result<()> {
     let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
-    let conn = Connection::open(db_path)?;
+    let mut conn = Connection::open(db_path)?;
+    let tx = conn.transaction()?;
 
-    conn.execute(
-        "INSERT OR REPLACE INTO entries (id, title, status, season, episode, watched_episodes) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        (&entry.id.to_string(), &entry.title, &entry.status.to_string(), &entry.season, &entry.episode, &entry.watched_episodes),
-    )?;
+    for (i, entry) in entries.iter().enumerate() {
+        tx.execute(
+            "UPDATE entries SET status = ?1, season = ?2, episode = ?3, watched_episodes = ?4, ordering = ?5 WHERE id = ?6",
+            (
+                &entry.status.to_string(),
+                &entry.season,
+                &entry.episode,
+                &entry.watched_episodes,
+                i as i64,
+                &entry.id.to_string(),
+            ),
+        )?;
+    }
 
+    tx.commit()?;
     Ok(())
 }
 
@@ -81,19 +86,6 @@ pub fn delete_entry(id: &Uuid, config: &Config) -> Result<()> {
 
     conn.execute("DELETE FROM entries WHERE id = ?1", [id.to_string()])?;
 
-    Ok(())
-}
-
-pub fn delete_entries(ids: &[Uuid], config: &Config) -> Result<()> {
-    let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
-    let mut conn = Connection::open(db_path)?;
-    let tx = conn.transaction()?;
-
-    for id in ids {
-        tx.execute("DELETE FROM entries WHERE id = ?1", [id.to_string()])?;
-    }
-
-    tx.commit()?;
     Ok(())
 }
 
@@ -108,6 +100,32 @@ fn add_watched_episodes_column_if_not_exists(conn: &Connection) -> Result<()> {
     if !column_exists {
         conn.execute(
             "ALTER TABLE entries ADD COLUMN watched_episodes INTEGER NOT NULL DEFAULT 0",
+            (),
+        )?;
+    }
+
+    Ok(())
+}
+
+fn add_ordering_column_if_not_exists(conn: &Connection) -> Result<()> {
+    let mut stmt = conn.prepare("PRAGMA table_info(entries)")?;
+    let column_exists = stmt
+        .query_map([], |row| row.get(1))?
+        .any(|col_name_result| {
+            col_name_result.map_or(false, |col_name: String| col_name == "ordering")
+        });
+
+    if !column_exists {
+        conn.execute("ALTER TABLE entries ADD COLUMN ordering INTEGER", ())?;
+        conn.execute(
+            "
+            WITH ordered_entries AS (
+                SELECT id, ROW_NUMBER() OVER (ORDER BY id) as rn
+                FROM entries
+            )
+            UPDATE entries
+            SET ordering = (SELECT rn FROM ordered_entries WHERE ordered_entries.id = entries.id) - 1
+            ",
             (),
         )?;
     }
@@ -138,12 +156,14 @@ pub fn init_db(config: &Config) -> Result<()> {
             status TEXT NOT NULL,
             season INTEGER NOT NULL,
             episode INTEGER NOT NULL,
-            watched_episodes INTEGER NOT NULL DEFAULT 0
+            watched_episodes INTEGER NOT NULL DEFAULT 0,
+            ordering INTEGER
         )",
         (),
     )?;
 
     add_watched_episodes_column_if_not_exists(&conn)?;
+    add_ordering_column_if_not_exists(&conn)?;
 
     Ok(())
 }

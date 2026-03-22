@@ -62,39 +62,27 @@ impl App {
     }
 
     pub fn add_entry(&mut self, title: String) {
-        match database::entry_exists_by_title(&title, &self.config) {
-            Ok(true) => {
-                self.error = Some(format!("Entry with title '{}' already exists!", title));
-                self.last_error_time = Some(Instant::now());
-            }
-            Ok(false) => {
-                let new_entry = Entry {
-                    id: Uuid::new_v4(),
-                    title,
-                    season: 1,
-                    episode: 0,
-                    status: Status::Planning,
-                    watched_episodes: 0,
-                };
-                match database::add_entry(&new_entry, &self.config) {
-                    Ok(_) => {
-                        let insert_index = self
-                            .entry
-                            .iter()
-                            .rposition(|entry| entry.status == Status::Planning)
-                            .map_or(0, |i| i + 1);
+        let new_entry = Entry {
+            id: Uuid::new_v4(),
+            title,
+            season: 1,
+            episode: 0,
+            status: Status::Planning,
+            watched_episodes: 0,
+        };
+        match database::add_entry(&new_entry, &self.config) {
+            Ok(_) => {
+                let insert_index = self
+                    .entry
+                    .iter()
+                    .rposition(|entry| entry.status == Status::Planning)
+                    .map_or(0, |i| i + 1);
 
-                        self.entry.insert(insert_index, new_entry);
-                        self.selected_index = insert_index;
-                    }
-                    Err(e) => {
-                        self.error = Some(format!("Failed to add entry to database: {}", e));
-                        self.last_error_time = Some(Instant::now());
-                    }
-                }
+                self.entry.insert(insert_index, new_entry);
+                self.selected_index = insert_index;
             }
             Err(e) => {
-                self.error = Some(format!("Failed to check for existing entry: {}", e));
+                self.error = Some(format!("Failed to add entry to database: {}", e));
                 self.last_error_time = Some(Instant::now());
             }
         }
@@ -139,11 +127,9 @@ impl App {
             self.entry.insert(insert_index, entry_to_move);
             self.selected_index = insert_index;
 
-            if let Some(updated_entry) = self.entry.get(self.selected_index) {
-                if let Err(e) = database::update_entry(updated_entry, &self.config) {
-                    self.error = Some(format!("Failed to update entry in database: {}", e));
-                    self.last_error_time = Some(Instant::now());
-                }
+            if let Err(e) = database::update_all_entries(&self.entry, &self.config) {
+                self.error = Some(format!("Failed to update entries in database: {}", e));
+                self.last_error_time = Some(Instant::now());
             }
         }
     }
@@ -152,12 +138,9 @@ impl App {
         if let Some(s) = self.entry.get_mut(self.selected_index) {
             s.episode += 1;
             s.watched_episodes += 1;
-            match database::update_entry(s, &self.config) {
-                Ok(_) => {}
-                Err(e) => {
-                    self.error = Some(format!("Failed to update entry in database: {}", e));
-                    self.last_error_time = Some(Instant::now());
-                }
+            if let Err(e) = database::update_all_entries(&self.entry, &self.config) {
+                self.error = Some(format!("Failed to update entry in database: {}", e));
+                self.last_error_time = Some(Instant::now());
             }
         }
     }
@@ -173,12 +156,9 @@ impl App {
                 s.season -= 1;
                 s.episode = 0;
             }
-            match database::update_entry(s, &self.config) {
-                Ok(_) => {}
-                Err(e) => {
-                    self.error = Some(format!("Failed to update entry in database: {}", e));
-                    self.last_error_time = Some(Instant::now());
-                }
+            if let Err(e) = database::update_all_entries(&self.entry, &self.config) {
+                self.error = Some(format!("Failed to update entry in database: {}", e));
+                self.last_error_time = Some(Instant::now());
             }
         }
     }
@@ -186,12 +166,9 @@ impl App {
     pub fn increment_watched_episodes(&mut self) {
         if let Some(s) = self.entry.get_mut(self.selected_index) {
             s.watched_episodes += 1;
-            match database::update_entry(s, &self.config) {
-                Ok(_) => {}
-                Err(e) => {
-                    self.error = Some(format!("Failed to save total episodes: {}", e));
-                    self.last_error_time = Some(Instant::now());
-                }
+            if let Err(e) = database::update_all_entries(&self.entry, &self.config) {
+                self.error = Some(format!("Failed to save total episodes: {}", e));
+                self.last_error_time = Some(Instant::now());
             }
         }
     }
@@ -200,12 +177,9 @@ impl App {
         if let Some(s) = self.entry.get_mut(self.selected_index) {
             if s.watched_episodes > 0 {
                 s.watched_episodes -= 1;
-                match database::update_entry(s, &self.config) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        self.error = Some(format!("Failed to save total episodes: {}", e));
-                        self.last_error_time = Some(Instant::now());
-                    }
+                if let Err(e) = database::update_all_entries(&self.entry, &self.config) {
+                    self.error = Some(format!("Failed to save total episodes: {}", e));
+                    self.last_error_time = Some(Instant::now());
                 }
             }
         }
@@ -215,12 +189,9 @@ impl App {
         if let Some(s) = self.entry.get_mut(self.selected_index) {
             s.season += 1;
             s.episode = 0;
-            match database::update_entry(s, &self.config) {
-                Ok(_) => {}
-                Err(e) => {
-                    self.error = Some(format!("Failed to update entry in database: {}", e));
-                    self.last_error_time = Some(Instant::now());
-                }
+            if let Err(e) = database::update_all_entries(&self.entry, &self.config) {
+                self.error = Some(format!("Failed to update entry in database: {}", e));
+                self.last_error_time = Some(Instant::now());
             }
         }
     }
@@ -340,15 +311,11 @@ impl App {
     pub fn drop_entry(&mut self) {
         if let Some(entry) = self.entry.get_mut(self.selected_index) {
             entry.status = Status::Dropped;
-            match database::update_entry(entry, &self.config) {
-                Ok(_) => {
-                    self.select_next_or_prev();
-                }
-                Err(e) => {
-                    self.error = Some(format!("Failed to drop entry in database: {}", e));
-                    self.last_error_time = Some(Instant::now());
-                }
+            if let Err(e) = database::update_all_entries(&self.entry, &self.config) {
+                self.error = Some(format!("Failed to drop entry in database: {}", e));
+                self.last_error_time = Some(Instant::now());
             }
+            self.select_next_or_prev();
         }
     }
 
@@ -406,12 +373,9 @@ impl App {
     pub fn edit_entry_title(&mut self, new_title: String) {
         if let Some(s) = self.entry.get_mut(self.selected_index) {
             s.title = new_title;
-            match database::update_entry(s, &self.config) {
-                Ok(_) => {}
-                Err(e) => {
-                    self.error = Some(format!("Failed to update entry title in database: {}", e));
-                    self.last_error_time = Some(Instant::now());
-                }
+            if let Err(e) = database::update_all_entries(&self.entry, &self.config) {
+                self.error = Some(format!("Failed to update entry title in database: {}", e));
+                self.last_error_time = Some(Instant::now());
             }
         }
     }
@@ -436,17 +400,9 @@ impl App {
                 self.entry.swap(global_idx_current, global_idx_prev);
                 self.selected_index = global_idx_prev;
 
-                if let Some(entry1) = self.entry.get(global_idx_current) {
-                    if let Err(e) = database::update_entry(entry1, &self.config) {
-                        self.error = Some(format!("Failed to update entry in database: {}", e));
-                        self.last_error_time = Some(Instant::now());
-                    }
-                }
-                if let Some(entry2) = self.entry.get(global_idx_prev) {
-                    if let Err(e) = database::update_entry(entry2, &self.config) {
-                        self.error = Some(format!("Failed to update entry in database: {}", e));
-                        self.last_error_time = Some(Instant::now());
-                    }
+                if let Err(e) = database::update_all_entries(&self.entry, &self.config) {
+                    self.error = Some(format!("Failed to update entries in database: {}", e));
+                    self.last_error_time = Some(Instant::now());
                 }
             }
         }
@@ -472,61 +428,48 @@ impl App {
                 self.entry.swap(global_idx_current, global_idx_next);
                 self.selected_index = global_idx_next;
 
-                if let Some(entry1) = self.entry.get(global_idx_current) {
-                    if let Err(e) = database::update_entry(entry1, &self.config) {
-                        self.error = Some(format!("Failed to update entry in database: {}", e));
-                        self.last_error_time = Some(Instant::now());
-                    }
-                }
-                if let Some(entry2) = self.entry.get(global_idx_next) {
-                    if let Err(e) = database::update_entry(entry2, &self.config) {
-                        self.error = Some(format!("Failed to update entry in database: {}", e));
-                        self.last_error_time = Some(Instant::now());
-                    }
+                if let Err(e) = database::update_all_entries(&self.entry, &self.config) {
+                    self.error = Some(format!("Failed to update entries in database: {}", e));
+                    self.last_error_time = Some(Instant::now());
                 }
             }
         }
     }
 
     pub fn force_remove_all_dropped_entries(&mut self) {
-        let dropped_entries_indices: Vec<usize> = self
+        let dropped_entry_ids: Vec<Uuid> = self
             .entry
             .iter()
-            .enumerate()
-            .filter(|(_, entry)| entry.status == Status::Dropped)
-            .map(|(index, _)| index)
+            .filter(|entry| entry.status == Status::Dropped)
+            .map(|entry| entry.id)
             .collect();
 
-        if dropped_entries_indices.is_empty() {
+        if dropped_entry_ids.is_empty() {
             return;
         }
 
-        let dropped_entry_ids: Vec<Uuid> = dropped_entries_indices
-            .iter()
-            .map(|&index| self.entry[index].id)
-            .collect();
-
-        match database::delete_entries(&dropped_entry_ids, &self.config) {
-            Ok(_) => {
-                let original_len = self.entry.len();
-                self.entry
-                    .retain(|entry| entry.status != Status::Dropped);
-                let removed_count = original_len - self.entry.len();
-
-                if removed_count > 0 {
-                    if !self.entry.is_empty() {
-                        self.selected_index = 0;
-                    } else {
-                        self.selected_index = 0;
-                    }
-                }
-            }
-            Err(e) => {
-                self.error = Some(format!(
-                    "Failed to delete entries from database: {}",
-                    e
-                ));
+        let mut has_error = false;
+        for id in &dropped_entry_ids {
+            if let Err(e) = database::delete_entry(id, &self.config) {
+                self.error = Some(format!("Failed to delete entry from database: {}", e));
                 self.last_error_time = Some(Instant::now());
+                has_error = true;
+                break;
+            }
+        }
+
+        if !has_error {
+            let original_len = self.entry.len();
+            self.entry
+                .retain(|entry| entry.status != Status::Dropped);
+            let removed_count = original_len - self.entry.len();
+
+            if removed_count > 0 {
+                if !self.entry.is_empty() {
+                    self.selected_index = 0;
+                } else {
+                    self.selected_index = 0;
+                }
             }
         }
     }
