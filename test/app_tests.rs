@@ -79,13 +79,77 @@ fn test_next_season() {
 
 #[test]
 fn test_move_to() {
-    let mut app = create_dummy_app();
+    let entries = vec![
+        Entry {
+            id: Uuid::new_v4(),
+            title: "P1".to_string(),
+            season: 1,
+            episode: 1,
+            status: Status::Planning,
+            watched_episodes: 0,
+        },
+        Entry {
+            id: Uuid::new_v4(),
+            title: "P2".to_string(),
+            season: 1,
+            episode: 1,
+            status: Status::Planning,
+            watched_episodes: 0,
+        },
+        Entry {
+            id: Uuid::new_v4(),
+            title: "W1".to_string(),
+            season: 1,
+            episode: 1,
+            status: Status::Watching,
+            watched_episodes: 0,
+        },
+        Entry {
+            id: Uuid::new_v4(),
+            title: "C1".to_string(),
+            season: 1,
+            episode: 1,
+            status: Status::Completed,
+            watched_episodes: 0,
+        },
+    ];
+    let config = Config {
+        storage_path: "dummy_path".to_string(),
+    };
+    let mut app = App::new(entries, config);
+
+    // Initial state: [P1, P2, W1, C1]
+    // App::new sets selected_index to the first planning entry, which is 0.
+
+    // Move W1 (index 2) to Planning
+    app.selected_index = 2;
+    app.move_to(Status::Planning);
+
+    // Expected state: [P1, P2, W1(P), C1]
+    // The moved entry "W1" should now be at index 2 with status Planning.
+    // The selected index should be updated to the new position.
+    assert_eq!(app.selected_index, 2);
+    assert_eq!(app.entry[2].title, "W1");
+    assert_eq!(app.entry[2].status, Status::Planning);
+    assert_eq!(app.entry[0].title, "P1");
+    assert_eq!(app.entry[1].title, "P2");
+    assert_eq!(app.entry[3].title, "C1");
+
+    // Now, move P1 (index 0) to Completed
     app.selected_index = 0;
     app.move_to(Status::Completed);
-    assert_eq!(app.entry[0].status, Status::Completed);
 
-    app.move_to(Status::Planning);
-    assert_eq!(app.entry[0].status, Status::Planning);
+    // Initial state for this move: [P1, P2, W1(P), C1]
+    // After removing P1: [P2, W1(P), C1]
+    // The last non-dropped item is C1 at index 2.
+    // So, P1(C) is inserted at index 3.
+    // Expected state: [P2, W1(P), C1, P1(C)]
+    assert_eq!(app.selected_index, 3);
+    assert_eq!(app.entry[3].title, "P1");
+    assert_eq!(app.entry[3].status, Status::Completed);
+    assert_eq!(app.entry[0].title, "P2");
+    assert_eq!(app.entry[1].title, "W1");
+    assert_eq!(app.entry[2].title, "C1");
 }
 
 #[test]

@@ -101,11 +101,46 @@ impl App {
     }
 
     pub fn move_to(&mut self, status: Status) {
-        if let Some(s) = self.entry.get_mut(self.selected_index) {
-            s.status = status;
-            match database::update_entry(s, &self.config) {
-                Ok(_) => {}
-                Err(e) => {
+        if self.selected_index < self.entry.len() {
+            let mut entry_to_move = self.entry.remove(self.selected_index);
+            entry_to_move.status = status;
+
+            let new_index = match status {
+                Status::Planning => self
+                    .entry
+                    .iter()
+                    .rposition(|e| e.status == Status::Planning)
+                    .map_or(0, |i| i + 1),
+                Status::Watching => self
+                    .entry
+                    .iter()
+                    .rposition(|e| e.status == Status::Planning || e.status == Status::Watching)
+                    .map_or(
+                        self.entry
+                            .iter()
+                            .position(|e| e.status == Status::Watching)
+                            .unwrap_or(0),
+                        |i| i + 1,
+                    ),
+                Status::Completed => self
+                    .entry
+                    .iter()
+                    .rposition(|e| {
+                        e.status == Status::Planning
+                            || e.status == Status::Watching
+                            || e.status == Status::Completed
+                    })
+                    .map_or(self.entry.len(), |i| i + 1),
+                Status::Dropped => self.entry.len(),
+            };
+
+            let insert_index = new_index.min(self.entry.len());
+
+            self.entry.insert(insert_index, entry_to_move);
+            self.selected_index = insert_index;
+
+            if let Some(updated_entry) = self.entry.get(self.selected_index) {
+                if let Err(e) = database::update_entry(updated_entry, &self.config) {
                     self.error = Some(format!("Failed to update entry in database: {}", e));
                     self.last_error_time = Some(Instant::now());
                 }
@@ -334,18 +369,7 @@ impl App {
     }
 
     pub fn reactivate_entry(&mut self) {
-        if let Some(entry) = self.entry.get_mut(self.selected_index) {
-            entry.status = Status::Planning;
-            match database::update_entry(entry, &self.config) {
-                Ok(_) => {
-                    self.select_next_or_prev();
-                }
-                Err(e) => {
-                    self.error = Some(format!("Failed to reactivate entry in database: {}", e));
-                    self.last_error_time = Some(Instant::now());
-                }
-            }
-        }
+        self.move_to(Status::Planning);
     }
 
     fn select_next_or_prev(&mut self) {
