@@ -33,6 +33,35 @@ pub fn load_entry(config: &Config) -> Result<Vec<Entry>> {
     Ok(entries)
 }
 
+pub fn get_entry_by_title(title: &str, config: &Config) -> Result<Option<Entry>> {
+    let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
+    let conn = Connection::open(db_path)?;
+
+    let mut stmt = conn.prepare(
+        "SELECT id, title, status, season, episode, watched_episodes FROM entries WHERE title = ?1",
+    )?;
+    let mut entries_iter = stmt.query_map([title], |row| {
+        let status_str: String = row.get(2)?;
+        let status = Status::from(status_str);
+        Ok(Entry {
+            id: Uuid::parse_str(&row.get::<_, String>(0)?).map_err(|_e| {
+                rusqlite::Error::InvalidColumnType(0, "uuid".to_string(), Type::Text)
+            })?,
+            title: row.get(1)?,
+            status,
+            season: row.get(3)?,
+            episode: row.get(4)?,
+            watched_episodes: row.get(5)?,
+        })
+    })?;
+
+    if let Some(entry_result) = entries_iter.next() {
+        Ok(Some(entry_result?))
+    } else {
+        Ok(None)
+    }
+}
+
 pub fn add_entry(entry: &Entry, config: &Config) -> Result<()> {
     let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
     let conn = Connection::open(db_path)?;

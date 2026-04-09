@@ -62,6 +62,22 @@ impl App {
     }
 
     pub fn add_entry(&mut self, title: String) {
+        match database::get_entry_by_title(&title, &self.config) {
+            Ok(Some(_)) => {
+                self.error = Some(format!("Entry with title '{}' already exists.", title));
+                self.last_error_time = Some(Instant::now());
+                return;
+            }
+            Ok(None) => {
+                // No duplicate, proceed to add
+            }
+            Err(e) => {
+                self.error = Some(format!("Failed to check for existing entry: {}", e));
+                self.last_error_time = Some(Instant::now());
+                return;
+            }
+        }
+
         let new_entry = Entry {
             id: Uuid::new_v4(),
             title,
