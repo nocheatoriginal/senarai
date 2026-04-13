@@ -291,19 +291,26 @@ fn draw_total_episodes_popup(f: &mut Frame, app: &mut App) {
     f.render_widget(Clear, area);
     f.render_widget(block.clone(), area);
 
+    let constraints = if app.input_mode == InputMode::MaxEpisodes {
+        vec![
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(5),
+            Constraint::Length(1),
+        ]
+    } else {
+        vec![
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(1),
+        ]
+    };
     let chunks = Layout::default()
         .margin(1)
         .direction(Direction::Vertical)
-        .constraints(
-            [
-                Constraint::Length(1),
-                Constraint::Length(1),
-                Constraint::Length(3),
-                Constraint::Length(3),
-                Constraint::Length(1),
-            ]
-            .as_ref(),
-        )
+        .constraints(constraints)
         .split(block.inner(area));
 
     let watched_text = if let Some(entry) = app.entry.get(app.selected_index) {
@@ -335,10 +342,10 @@ fn draw_total_episodes_popup(f: &mut Frame, app: &mut App) {
     let help_paragraph = Paragraph::new(help_text)
         .style(Style::default().fg(consts::FOOTER_TEXT_COLOR))
         .alignment(Alignment::Center);
-    f.render_widget(help_paragraph, chunks[4]);
 
     if app.input_mode == InputMode::MaxEpisodes {
-        draw_popup_input(f, area, app, "Set Max Episodes");
+        draw_popup_input(f, chunks[2], app, "Set Max Episodes");
+        f.render_widget(help_paragraph, chunks[3]);
     } else {
         let progress_label =
             Paragraph::new(format!("Progress: {}%", app.selected_entry_progress()))
@@ -355,11 +362,11 @@ fn draw_total_episodes_popup(f: &mut Frame, app: &mut App) {
             .ratio(app.selected_entry_progress() as f64 / 100.0)
             .label("");
         f.render_widget(gauge, chunks[3]);
+        f.render_widget(help_paragraph, chunks[4]);
     }
 }
 
-fn draw_popup_input(f: &mut Frame, popup_area: Rect, app: &mut App, title: &str) {
-    let area = centered_rect(34, 18, popup_area);
+fn draw_popup_input(f: &mut Frame, area: Rect, app: &mut App, title: &str) {
     let input = Paragraph::new(app.input.as_str())
         .style(Style::default().fg(consts::TEXT_COLOR))
         .block(
