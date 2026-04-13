@@ -1,6 +1,9 @@
 use crate::{app::App, app::InputMode, consts, Entry, Status};
 use ratatui::{prelude::*, widgets::*};
 
+const EPISODE_PROGRESS_BASE_COLOR: (u8, u8, u8) = (90, 145, 220);
+const EPISODE_PROGRESS_MIN_BRIGHTNESS: f32 = 0.78;
+
 pub fn draw_ui(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -353,17 +356,55 @@ fn draw_total_episodes_popup(f: &mut Frame, app: &mut App) {
                 .alignment(Alignment::Center);
         f.render_widget(progress_label, chunks[2]);
 
-        let gauge = Gauge::default()
-            .gauge_style(
-                Style::default()
-                    .fg(consts::BORDER_COLOR)
-                    .bg(consts::FOOTER_TEXT_COLOR),
-            )
-            .ratio(app.selected_entry_progress() as f64 / 100.0)
-            .label("");
-        f.render_widget(gauge, chunks[3]);
+        draw_episode_progress_bar(f, chunks[3], app.selected_entry_progress());
         f.render_widget(help_paragraph, chunks[4]);
     }
+}
+
+fn draw_episode_progress_bar(f: &mut Frame, area: Rect, progress: u16) {
+    if area.width == 0 {
+        return;
+    }
+
+    let total_cells = area.width as usize;
+    let filled_cells = ((total_cells as u32 * progress as u32) + 50) / 100;
+    let filled_cells = filled_cells.min(total_cells as u32) as usize;
+
+    let spans = (0..total_cells)
+        .map(|index| {
+            let style = if index < filled_cells {
+                Style::default().fg(episode_progress_color(index, filled_cells))
+            } else {
+                Style::default().fg(consts::FOOTER_TEXT_COLOR)
+            };
+
+            Span::styled("█", style)
+        })
+        .collect::<Vec<_>>();
+
+    let progress_bar = Paragraph::new(Line::from(spans));
+    f.render_widget(progress_bar, area);
+}
+
+fn episode_progress_color(index: usize, filled_cells: usize) -> Color {
+    let (red, green, blue) = EPISODE_PROGRESS_BASE_COLOR;
+
+    let brightness = if filled_cells <= 1 {
+        1.0
+    } else {
+        let step = index as f32 / (filled_cells - 1) as f32;
+        1.0 - (1.0 - EPISODE_PROGRESS_MIN_BRIGHTNESS) * step
+    };
+
+    Color::Rgb(
+        scale_channel(red, brightness),
+        scale_channel(green, brightness),
+        scale_channel(blue, brightness),
+    )
+}
+
+fn scale_channel(channel: u8, brightness: f32) -> u8 {
+    ((channel as f32 * brightness).round()).clamp(0.0, 255.0) as u8
 }
 
 fn draw_popup_input(f: &mut Frame, area: Rect, app: &mut App, title: &str) {
