@@ -34,6 +34,7 @@ fn handle_key(key: KeyEvent, app: &mut App) -> InputResult {
     match app.input_mode {
         InputMode::Normal => handle_normal_mode_key(key, app),
         InputMode::Adding | InputMode::Editing => handle_input_mode_key(key, app),
+        InputMode::MaxEpisodes => handle_max_episodes_input_mode_key(key, app),
         InputMode::ConfirmDelete => handle_confirm_delete_mode_key(key, app),
         InputMode::ConfirmDeleteAllDropped => handle_confirm_delete_mode_key(key, app),
         InputMode::Dropped => handle_dropped_mode_key(key, app),
@@ -47,6 +48,13 @@ fn handle_total_episodes_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
             app.show_total_episodes_popup = false;
             app.input_mode = InputMode::Normal;
         }
+        KeyCode::Char('#') => {
+            if app.entry.get(app.selected_index).is_some() {
+                app.input.clear();
+                app.cursor_position = 0;
+                app.input_mode = InputMode::MaxEpisodes;
+            }
+        }
         KeyCode::Char('+') => {
             app.increment_watched_episodes();
             return InputResult::Modified;
@@ -54,6 +62,71 @@ fn handle_total_episodes_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
         KeyCode::Char('-') => {
             app.decrement_watched_episodes();
             return InputResult::Modified;
+        }
+        _ => {}
+    }
+    InputResult::Success
+}
+
+fn handle_max_episodes_input_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
+    match key.code {
+        KeyCode::Enter => {
+            let value = app.input.parse::<u32>().unwrap_or(0);
+            app.set_max_episodes(value);
+            app.input.clear();
+            app.cursor_position = 0;
+            app.input_mode = InputMode::TotalEpisodes;
+            return InputResult::Modified;
+        }
+        KeyCode::Char(c) if c.is_ascii_digit() => {
+            let graphemes = app.input.graphemes(true).collect::<Vec<&str>>();
+            let byte_pos = if app.cursor_position >= graphemes.len() {
+                app.input.len()
+            } else {
+                graphemes
+                    .iter()
+                    .take(app.cursor_position)
+                    .map(|s| s.len())
+                    .sum()
+            };
+            app.input.insert(byte_pos, c);
+            app.cursor_position = clamp_cursor(app.cursor_position + 1, &app.input);
+        }
+        KeyCode::Backspace => {
+            if app.cursor_position > 0 {
+                let graphemes = app.input.graphemes(true).collect::<Vec<&str>>();
+                let byte_pos: usize = graphemes
+                    .iter()
+                    .take(app.cursor_position - 1)
+                    .map(|s| s.len())
+                    .sum();
+                let char_len = graphemes[app.cursor_position - 1].len();
+                app.input.replace_range(byte_pos..byte_pos + char_len, "");
+                app.cursor_position = clamp_cursor(app.cursor_position - 1, &app.input);
+            }
+        }
+        KeyCode::Delete => {
+            let graphemes = app.input.graphemes(true).collect::<Vec<&str>>();
+            if app.cursor_position < graphemes.len() {
+                let byte_pos: usize = graphemes
+                    .iter()
+                    .take(app.cursor_position)
+                    .map(|s| s.len())
+                    .sum();
+                let char_len = graphemes[app.cursor_position].len();
+                app.input.replace_range(byte_pos..byte_pos + char_len, "");
+            }
+        }
+        KeyCode::Left => {
+            app.cursor_position = clamp_cursor(app.cursor_position.saturating_sub(1), &app.input);
+        }
+        KeyCode::Right => {
+            app.cursor_position = clamp_cursor(app.cursor_position + 1, &app.input);
+        }
+        KeyCode::Esc => {
+            app.input.clear();
+            app.cursor_position = 0;
+            app.input_mode = InputMode::TotalEpisodes;
         }
         _ => {}
     }
@@ -192,16 +265,26 @@ fn handle_input_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
             let byte_pos = if app.cursor_position >= graphemes.len() {
                 app.input.len()
             } else {
-                graphemes.iter().take(app.cursor_position).map(|s| s.len()).sum()
+                graphemes
+                    .iter()
+                    .take(app.cursor_position)
+                    .map(|s| s.len())
+                    .sum()
             };
             app.input.insert_str(byte_pos, &char_to_insert);
-            app.cursor_position =
-                clamp_cursor(app.cursor_position + char_to_insert.graphemes(true).count(), &app.input);
+            app.cursor_position = clamp_cursor(
+                app.cursor_position + char_to_insert.graphemes(true).count(),
+                &app.input,
+            );
         }
         KeyCode::Backspace => {
             if app.cursor_position > 0 {
                 let graphemes = app.input.graphemes(true).collect::<Vec<&str>>();
-                let byte_pos: usize = graphemes.iter().take(app.cursor_position - 1).map(|s| s.len()).sum();
+                let byte_pos: usize = graphemes
+                    .iter()
+                    .take(app.cursor_position - 1)
+                    .map(|s| s.len())
+                    .sum();
                 let char_len = graphemes[app.cursor_position - 1].len();
                 app.input.replace_range(byte_pos..byte_pos + char_len, "");
                 app.cursor_position = clamp_cursor(app.cursor_position - 1, &app.input);
@@ -210,7 +293,11 @@ fn handle_input_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
         KeyCode::Delete => {
             let graphemes = app.input.graphemes(true).collect::<Vec<&str>>();
             if app.cursor_position < graphemes.len() {
-                let byte_pos: usize = graphemes.iter().take(app.cursor_position).map(|s| s.len()).sum();
+                let byte_pos: usize = graphemes
+                    .iter()
+                    .take(app.cursor_position)
+                    .map(|s| s.len())
+                    .sum();
                 let char_len = graphemes[app.cursor_position].len();
                 app.input.replace_range(byte_pos..byte_pos + char_len, "");
             }
@@ -444,4 +531,3 @@ fn handle_mouse(mouse: MouseEvent, app: &mut App) -> InputResult {
     }
     InputResult::Success
 }
-

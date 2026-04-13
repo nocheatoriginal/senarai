@@ -60,6 +60,7 @@ pub struct Entry {
     pub episode: u32,
     pub status: Status,
     pub watched_episodes: u32,
+    pub max_episodes: u32,
 }
 
 pub mod app;

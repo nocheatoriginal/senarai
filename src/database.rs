@@ -9,7 +9,7 @@ pub fn load_entry(config: &Config) -> Result<Vec<Entry>> {
     let conn = Connection::open(db_path)?;
 
     let mut stmt = conn.prepare(
-        "SELECT id, title, status, season, episode, watched_episodes FROM entries ORDER BY ordering ASC",
+        "SELECT id, title, status, season, episode, watched_episodes, max_episodes FROM entries ORDER BY ordering ASC",
     )?;
     let entries_iter = stmt.query_map([], |row| {
         let status_str: String = row.get(2)?;
@@ -23,6 +23,7 @@ pub fn load_entry(config: &Config) -> Result<Vec<Entry>> {
             season: row.get(3)?,
             episode: row.get(4)?,
             watched_episodes: row.get(5)?,
+            max_episodes: row.get(6)?,
         })
     })?;
 
@@ -38,7 +39,7 @@ pub fn get_entry_by_title(title: &str, config: &Config) -> Result<Option<Entry>>
     let conn = Connection::open(db_path)?;
 
     let mut stmt = conn.prepare(
-        "SELECT id, title, status, season, episode, watched_episodes FROM entries WHERE title = ?1",
+        "SELECT id, title, status, season, episode, watched_episodes, max_episodes FROM entries WHERE title = ?1",
     )?;
     let mut entries_iter = stmt.query_map([title], |row| {
         let status_str: String = row.get(2)?;
@@ -52,6 +53,7 @@ pub fn get_entry_by_title(title: &str, config: &Config) -> Result<Option<Entry>>
             season: row.get(3)?,
             episode: row.get(4)?,
             watched_episodes: row.get(5)?,
+            max_episodes: row.get(6)?,
         })
     })?;
 
@@ -71,7 +73,7 @@ pub fn add_entry(entry: &Entry, config: &Config) -> Result<()> {
     })?;
 
     conn.execute(
-        "INSERT INTO entries (id, title, status, season, episode, watched_episodes, ordering) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT INTO entries (id, title, status, season, episode, watched_episodes, max_episodes, ordering) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         (
             &entry.id.to_string(),
             &entry.title,
@@ -79,6 +81,7 @@ pub fn add_entry(entry: &Entry, config: &Config) -> Result<()> {
             &entry.season,
             &entry.episode,
             &entry.watched_episodes,
+            &entry.max_episodes,
             max_ordering + 1,
         ),
     )?;
@@ -93,12 +96,13 @@ pub fn update_all_entries(entries: &[Entry], config: &Config) -> Result<()> {
 
     for (i, entry) in entries.iter().enumerate() {
         tx.execute(
-            "UPDATE entries SET status = ?1, season = ?2, episode = ?3, watched_episodes = ?4, ordering = ?5 WHERE id = ?6",
+            "UPDATE entries SET status = ?1, season = ?2, episode = ?3, watched_episodes = ?4, max_episodes = ?5, ordering = ?6 WHERE id = ?7",
             (
                 &entry.status.to_string(),
                 &entry.season,
                 &entry.episode,
                 &entry.watched_episodes,
+                &entry.max_episodes,
                 i as i64,
                 &entry.id.to_string(),
             ),
@@ -162,6 +166,24 @@ fn add_ordering_column_if_not_exists(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+fn add_max_episodes_column_if_not_exists(conn: &Connection) -> Result<()> {
+    let mut stmt = conn.prepare("PRAGMA table_info(entries)")?;
+    let column_exists = stmt
+        .query_map([], |row| row.get(1))?
+        .any(|col_name_result| {
+            col_name_result.map_or(false, |col_name: String| col_name == "max_episodes")
+        });
+
+    if !column_exists {
+        conn.execute(
+            "ALTER TABLE entries ADD COLUMN max_episodes INTEGER NOT NULL DEFAULT 0",
+            (),
+        )?;
+    }
+
+    Ok(())
+}
+
 pub fn init_db(config: &Config) -> Result<()> {
     let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
 
@@ -186,12 +208,14 @@ pub fn init_db(config: &Config) -> Result<()> {
             season INTEGER NOT NULL,
             episode INTEGER NOT NULL,
             watched_episodes INTEGER NOT NULL DEFAULT 0,
+            max_episodes INTEGER NOT NULL DEFAULT 0,
             ordering INTEGER
         )",
         (),
     )?;
 
     add_watched_episodes_column_if_not_exists(&conn)?;
+    add_max_episodes_column_if_not_exists(&conn)?;
     add_ordering_column_if_not_exists(&conn)?;
 
     Ok(())

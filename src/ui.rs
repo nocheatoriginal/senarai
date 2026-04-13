@@ -1,4 +1,4 @@
-use crate::{app::App, app::InputMode, consts, Status, Entry};
+use crate::{app::App, app::InputMode, consts, Entry, Status};
 use ratatui::{prelude::*, widgets::*};
 
 pub fn draw_ui(f: &mut Frame, app: &mut App) {
@@ -6,13 +6,17 @@ pub fn draw_ui(f: &mut Frame, app: &mut App) {
         .direction(Direction::Vertical)
         .constraints(match app.input_mode {
             InputMode::Normal
+            | InputMode::MaxEpisodes
             | InputMode::ConfirmDelete
             | InputMode::Dropped
             | InputMode::ConfirmDeleteAllDropped
             | InputMode::TotalEpisodes => [Constraint::Min(0), Constraint::Length(1)].as_ref(),
-            InputMode::Adding | InputMode::Editing => {
-                [Constraint::Min(0), Constraint::Length(3), Constraint::Length(1)].as_ref()
-            }
+            InputMode::Adding | InputMode::Editing => [
+                Constraint::Min(0),
+                Constraint::Length(3),
+                Constraint::Length(1),
+            ]
+            .as_ref(),
         })
         .split(f.size());
 
@@ -80,12 +84,11 @@ fn draw_main(f: &mut Frame, area: Rect, app: &mut App) {
                 }
                 let prefix_len = prefix.chars().count();
 
-                let max_title_chars =
-                    if col_width > suffix_len + prefix_len + consts::PADDING {
-                        col_width - suffix_len - prefix_len - consts::PADDING
-                    } else {
-                        0
-                    };
+                let max_title_chars = if col_width > suffix_len + prefix_len + consts::PADDING {
+                    col_width - suffix_len - prefix_len - consts::PADDING
+                } else {
+                    0
+                };
 
                 let title = if s.title.chars().count() > max_title_chars {
                     let take = max_title_chars.saturating_sub(3);
@@ -95,20 +98,19 @@ fn draw_main(f: &mut Frame, area: Rect, app: &mut App) {
                 } else {
                     s.title.clone()
                 };
-                ListItem::new(format!(
-                    "{}{}{}",
-                    prefix,
-                    title,
-                    suffix
-                ))
-                .style(Style::default().fg(consts::TEXT_COLOR))
+                ListItem::new(format!("{}{}{}", prefix, title, suffix))
+                    .style(Style::default().fg(consts::TEXT_COLOR))
             })
             .collect();
 
         let list = List::new(items)
             .block(
                 Block::default()
-                    .title(format!("{} ({})", status.to_string(), entry_in_status.len()))
+                    .title(format!(
+                        "{} ({})",
+                        status.to_string(),
+                        entry_in_status.len()
+                    ))
                     .borders(Borders::ALL)
                     .border_style(Style::default().fg(consts::BORDER_COLOR))
                     .title_style(Style::default().fg(consts::TITLE_COLOR)),
@@ -277,7 +279,7 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
 }
 
 fn draw_total_episodes_popup(f: &mut Frame, app: &mut App) {
-    let area = centered_rect(30, 20, f.size()); // Adjust size as needed
+    let area = centered_rect(42, 32, f.size());
 
     let block = Block::default()
         .title("Episodes Watched")
@@ -292,27 +294,84 @@ fn draw_total_episodes_popup(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .margin(1)
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(0), Constraint::Length(1)].as_ref())
+        .constraints(
+            [
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(3),
+                Constraint::Length(3),
+                Constraint::Length(1),
+            ]
+            .as_ref(),
+        )
         .split(block.inner(area));
 
-    let text = if let Some(entry) = app.entry.get(app.selected_index) {
-        format!("{}", entry.watched_episodes)
+    let watched_text = if let Some(entry) = app.entry.get(app.selected_index) {
+        format!("Watched Episodes: {}", entry.watched_episodes)
     } else {
         "N/A".to_string()
     };
 
-    let paragraph = Paragraph::new(text)
+    let watched_paragraph = Paragraph::new(watched_text)
         .style(Style::default().fg(consts::TEXT_COLOR))
         .alignment(Alignment::Center);
+    f.render_widget(watched_paragraph, chunks[0]);
 
-    f.render_widget(paragraph, chunks[0]);
+    let max_text = if let Some(entry) = app.entry.get(app.selected_index) {
+        format!("Max Episodes: {}", entry.max_episodes)
+    } else {
+        "Max Episodes: N/A".to_string()
+    };
+    let max_paragraph = Paragraph::new(max_text)
+        .style(Style::default().fg(consts::TEXT_COLOR))
+        .alignment(Alignment::Center);
+    f.render_widget(max_paragraph, chunks[1]);
 
-    let help_text = "(o/enter: close, +/-: adjust)";
+    let help_text = if app.input_mode == InputMode::MaxEpisodes {
+        "Max Episodes"
+    } else {
+        "(o/enter: close, +/-: adjust, #: set max)"
+    };
     let help_paragraph = Paragraph::new(help_text)
         .style(Style::default().fg(consts::FOOTER_TEXT_COLOR))
         .alignment(Alignment::Center);
+    f.render_widget(help_paragraph, chunks[4]);
 
-    f.render_widget(help_paragraph, chunks[1]);
+    if app.input_mode == InputMode::MaxEpisodes {
+        draw_popup_input(f, area, app, "Set Max Episodes");
+    } else {
+        let progress_label =
+            Paragraph::new(format!("Progress: {}%", app.selected_entry_progress()))
+                .style(Style::default().fg(consts::TEXT_COLOR))
+                .alignment(Alignment::Center);
+        f.render_widget(progress_label, chunks[2]);
+
+        let gauge = Gauge::default()
+            .gauge_style(
+                Style::default()
+                    .fg(consts::BORDER_COLOR)
+                    .bg(consts::FOOTER_TEXT_COLOR),
+            )
+            .ratio(app.selected_entry_progress() as f64 / 100.0)
+            .label("");
+        f.render_widget(gauge, chunks[3]);
+    }
+}
+
+fn draw_popup_input(f: &mut Frame, popup_area: Rect, app: &mut App, title: &str) {
+    let area = centered_rect(34, 18, popup_area);
+    let input = Paragraph::new(app.input.as_str())
+        .style(Style::default().fg(consts::TEXT_COLOR))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(title)
+                .border_style(Style::default().fg(consts::BORDER_COLOR))
+                .title_style(Style::default().fg(consts::TITLE_COLOR)),
+        );
+    f.render_widget(Clear, area);
+    f.render_widget(input, area);
+    f.set_cursor(area.x + app.cursor_position as u16 + 1, area.y + 1);
 }
 
 fn draw_title_popup(f: &mut Frame, app: &App) {
@@ -423,14 +482,21 @@ fn draw_confirmation_popup(f: &mut Frame, app: &App) {
     let (title, message) = match app.input_mode {
         InputMode::ConfirmDelete => {
             if app.show_dropped {
-                ("Confirm Deletion", "Are you sure you want to delete this entry? (y/n)")
+                (
+                    "Confirm Deletion",
+                    "Are you sure you want to delete this entry? (y/n)",
+                )
             } else {
-                ("Confirm Drop", "Are you sure you want to drop this entry? (y/n)")
+                (
+                    "Confirm Drop",
+                    "Are you sure you want to drop this entry? (y/n)",
+                )
             }
         }
-        InputMode::ConfirmDeleteAllDropped => {
-            ("Confirm Deletion", "Are you sure you want to delete ALL dropped entries? (y/n)")
-        }
+        InputMode::ConfirmDeleteAllDropped => (
+            "Confirm Deletion",
+            "Are you sure you want to delete ALL dropped entries? (y/n)",
+        ),
         _ => return, // Should not happen
     };
 

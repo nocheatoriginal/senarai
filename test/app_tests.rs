@@ -12,6 +12,7 @@ fn create_dummy_app() -> App {
             episode: 1,
             status: Status::Watching,
             watched_episodes: 0,
+            max_episodes: 0,
         },
         Entry {
             id: Uuid::parse_str("772d2d49-9ce7-4db7-bd33-8dfb93617af4").unwrap(),
@@ -20,6 +21,7 @@ fn create_dummy_app() -> App {
             episode: 5,
             status: Status::Completed,
             watched_episodes: 0,
+            max_episodes: 0,
         },
         Entry {
             id: Uuid::parse_str("2cd6538f-944b-429e-b840-98ec89ed49ef").unwrap(),
@@ -28,6 +30,7 @@ fn create_dummy_app() -> App {
             episode: 0,
             status: Status::Planning,
             watched_episodes: 0,
+            max_episodes: 0,
         },
     ];
     let config = Config {
@@ -35,8 +38,6 @@ fn create_dummy_app() -> App {
     };
     App::new(entries, config)
 }
-
-
 
 #[test]
 fn test_next_episode() {
@@ -87,6 +88,7 @@ fn test_move_to() {
             episode: 1,
             status: Status::Planning,
             watched_episodes: 0,
+            max_episodes: 0,
         },
         Entry {
             id: Uuid::new_v4(),
@@ -95,6 +97,7 @@ fn test_move_to() {
             episode: 1,
             status: Status::Planning,
             watched_episodes: 0,
+            max_episodes: 0,
         },
         Entry {
             id: Uuid::new_v4(),
@@ -103,6 +106,7 @@ fn test_move_to() {
             episode: 1,
             status: Status::Watching,
             watched_episodes: 0,
+            max_episodes: 0,
         },
         Entry {
             id: Uuid::new_v4(),
@@ -111,6 +115,7 @@ fn test_move_to() {
             episode: 1,
             status: Status::Completed,
             watched_episodes: 0,
+            max_episodes: 0,
         },
     ];
     let config = Config {
@@ -159,4 +164,26 @@ fn test_edit_entry_title() {
     let new_title = "Edited Title".to_string();
     app.entry[app.selected_index].title = new_title.clone();
     assert_eq!(app.entry[0].title, new_title);
+}
+
+#[test]
+fn test_selected_entry_progress_rules() {
+    let mut app = create_dummy_app();
+
+    app.selected_index = 0;
+    app.entry[0].watched_episodes = 3;
+    app.entry[0].max_episodes = 10;
+    app.entry[0].status = Status::Watching;
+    assert_eq!(app.selected_entry_progress(), 30);
+
+    app.entry[0].max_episodes = 0;
+    assert_eq!(app.selected_entry_progress(), 0);
+
+    app.entry[0].max_episodes = 10;
+    app.entry[0].status = Status::Completed;
+    assert_eq!(app.selected_entry_progress(), 100);
+
+    app.entry[0].status = Status::Watching;
+    app.entry[0].watched_episodes = 12;
+    assert_eq!(app.selected_entry_progress(), 100);
 }

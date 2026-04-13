@@ -8,6 +8,7 @@ pub enum InputMode {
     Normal,
     Editing,
     Adding,
+    MaxEpisodes,
     ConfirmDelete,
     Dropped,
     ConfirmDeleteAllDropped,
@@ -85,6 +86,7 @@ impl App {
             episode: 0,
             status: Status::Planning,
             watched_episodes: 0,
+            max_episodes: 0,
         };
         match database::add_entry(&new_entry, &self.config) {
             Ok(_) => {
@@ -199,6 +201,32 @@ impl App {
                 }
             }
         }
+    }
+
+    pub fn set_max_episodes(&mut self, max_episodes: u32) {
+        if let Some(s) = self.entry.get_mut(self.selected_index) {
+            s.max_episodes = max_episodes;
+            if let Err(e) = database::update_all_entries(&self.entry, &self.config) {
+                self.error = Some(format!("Failed to save max episodes: {}", e));
+                self.last_error_time = Some(Instant::now());
+            }
+        }
+    }
+
+    pub fn selected_entry_progress(&self) -> u16 {
+        let Some(entry) = self.entry.get(self.selected_index) else {
+            return 0;
+        };
+
+        if entry.status == Status::Completed {
+            return 100;
+        }
+
+        if entry.max_episodes == 0 {
+            return 0;
+        }
+
+        ((entry.watched_episodes.saturating_mul(100)) / entry.max_episodes).min(100) as u16
     }
 
     pub fn next_season(&mut self) {
@@ -476,8 +504,7 @@ impl App {
 
         if !has_error {
             let original_len = self.entry.len();
-            self.entry
-                .retain(|entry| entry.status != Status::Dropped);
+            self.entry.retain(|entry| entry.status != Status::Dropped);
             let removed_count = original_len - self.entry.len();
 
             if removed_count > 0 {
