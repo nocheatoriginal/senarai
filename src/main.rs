@@ -16,27 +16,27 @@ fn main() -> io::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
     terminal.clear()?;
 
-    let (config, config_error) = match config::load_config() {
+    let (mut config, mut config_error) = match config::load_config() {
         Ok(config) => (config, None),
         Err(e) => (config::Config::default(), Some(e)),
     };
 
-    if let Err(e) = database::init_db(&config) {
-        let mut app = App::new(Vec::new(), config.clone());
-        app.error = Some(e.to_string());
-        app.last_error_time = Some(Instant::now());
+    if let Err(error) = config.restore_last_database() {
+        config_error = Some(error);
     }
-
-    let entry = match database::load_entry(&config) {
-        Ok(entry) => entry,
-        Err(e) => {
-            let mut app = App::new(Vec::new(), config.clone());
-            app.error = Some(e.to_string());
-            app.last_error_time = Some(Instant::now());
+    let entry = match database::init_db(&config).and_then(|_| database::load_entry(&config)) {
+        Ok(entries) => {
+            if let Err(error) = config.remember_database() {
+                config_error = Some(error);
+            }
+            entries
+        }
+        Err(error) => {
+            config_error = Some(error.to_string());
             Vec::new()
         }
     };
-    let mut app = App::new(entry, config.clone());
+    let mut app = App::new(entry, config);
 
     if let Some(e) = config_error {
         app.error = Some(e);

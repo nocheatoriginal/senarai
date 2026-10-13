@@ -9,6 +9,7 @@ pub fn draw_ui(f: &mut Frame, app: &mut App) {
         .direction(Direction::Vertical)
         .constraints(match app.input_mode {
             InputMode::Normal
+            | InputMode::ChoosingDatabase
             | InputMode::MaxEpisodes
             | InputMode::ConfirmDelete
             | InputMode::Dropped
@@ -44,6 +45,9 @@ pub fn draw_ui(f: &mut Frame, app: &mut App) {
     }
 
     draw_title_popup(f, app);
+    if app.input_mode == InputMode::ChoosingDatabase {
+        draw_database_picker(f, app);
+    }
     draw_error_popup(f, app);
 
     if let InputMode::ConfirmDelete | InputMode::ConfirmDeleteAllDropped = app.input_mode {
@@ -157,12 +161,12 @@ fn draw_input(f: &mut Frame, area: Rect, app: &mut App) {
 }
 
 fn draw_footer(f: &mut Frame, area: Rect) {
-    let text = "q: quit | a: add | e: edit | h: help | d: dropped | up/down: select | left/right: navigate";
+    let text = "q: quit | c: database | a: add | e: edit | h: help | d: dropped | up/down: select | left/right: navigate";
     let text_width = text.len() as u16;
     let text = if text_width > area.width {
         let mut truncated_text = text
             .chars()
-            .take(area.width as usize - 3)
+            .take((area.width as usize).saturating_sub(3))
             .collect::<String>();
         truncated_text.push_str("...");
         truncated_text
@@ -231,6 +235,7 @@ fn draw_help(f: &mut Frame, storage_path: &str) {
 
 fn get_help_text_left() -> String {
     "a: add new entry
+    c: change database
     e: edit entry
     d: show dropped
     o: total episodes
@@ -763,4 +768,50 @@ pub fn get_dropped_mouse_selection(app: &mut App) -> Option<usize> {
         }
     }
     None
+}
+
+fn draw_database_picker(f: &mut Frame, app: &mut App) {
+    let area = centered_rect(80, 70, f.size());
+    let block = Block::default()
+        .title(format!("Databases — {}", app.config.storage_path))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(consts::BORDER_COLOR))
+        .title_style(Style::default().fg(consts::TITLE_COLOR));
+    f.render_widget(Clear, area);
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(1)])
+        .split(inner);
+    if app.database_files.is_empty() {
+        f.render_widget(Paragraph::new("No .db files found."), chunks[0]);
+    } else {
+        let items: Vec<ListItem> = app
+            .database_files
+            .iter()
+            .map(|name| {
+                let active = if *name == app.config.database_file {
+                    " (active)"
+                } else {
+                    ""
+                };
+                ListItem::new(format!("{}{active}", name.display()))
+            })
+            .collect();
+        let list = List::new(items)
+            .style(Style::default().fg(consts::TEXT_COLOR))
+            .highlight_symbol("> ")
+            .highlight_style(
+                Style::default()
+                    .bg(consts::HIGHLIGHT_BG)
+                    .fg(consts::HIGHLIGHT_FG),
+            );
+        f.render_stateful_widget(list, chunks[0], &mut app.database_list_state);
+    }
+    f.render_widget(
+        Paragraph::new("↑/↓: select | Enter: open | Esc: cancel")
+            .style(Style::default().fg(consts::FOOTER_TEXT_COLOR)),
+        chunks[1],
+    );
 }

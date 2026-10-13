@@ -1,5 +1,6 @@
 use crate::{config::Config, database, Entry, Status};
-use ratatui::layout::Rect;
+use ratatui::{layout::Rect, widgets::ListState};
+use std::path::PathBuf;
 use std::time::Instant;
 use uuid::Uuid;
 
@@ -13,10 +14,13 @@ pub enum InputMode {
     Dropped,
     ConfirmDeleteAllDropped,
     TotalEpisodes,
+    ChoosingDatabase,
 }
 
 pub struct App {
     pub entry: Vec<Entry>,
+    pub database_files: Vec<PathBuf>,
+    pub database_list_state: ListState,
     pub selected_index: usize,
     pub mouse_pos: (u16, u16),
     pub dragged_entry: Option<(usize, Status)>,
@@ -40,6 +44,8 @@ impl App {
     pub fn new(entry: Vec<Entry>, config: Config) -> Self {
         let mut app = Self {
             entry,
+            database_files: Vec::new(),
+            database_list_state: ListState::default(),
             selected_index: 0,
             mouse_pos: (0, 0),
             dragged_entry: None,
@@ -60,6 +66,54 @@ impl App {
         };
         app.select_first_entry_in_normal_view();
         app
+    }
+
+    pub fn open_database_picker(&mut self) -> Result<(), String> {
+        self.database_files = database::list_databases(&self.config)
+            .map_err(|e| format!("Failed to list databases: {e}"))?;
+        let selected = self
+            .database_files
+            .iter()
+            .position(|name| *name == self.config.database_file)
+            .or_else(|| (!self.database_files.is_empty()).then_some(0));
+        self.database_list_state = ListState::default();
+        self.database_list_state.select(selected);
+        self.dragged_entry = None;
+        self.input_mode = InputMode::ChoosingDatabase;
+        Ok(())
+    }
+
+    pub fn open_selected_database(&mut self) -> Result<(), String> {
+        let Some(name) = self
+            .database_list_state
+            .selected()
+            .and_then(|index| self.database_files.get(index))
+        else {
+            return Ok(());
+        };
+        let mut config = self.config.clone();
+        config.database_file = name.clone();
+        if !config.database_path().is_file() {
+            return Err("Selected database no longer exists.".to_string());
+        }
+        database::init_db(&config).map_err(|e| format!("Failed to open database: {e}"))?;
+        let entries =
+            database::load_entry(&config).map_err(|e| format!("Failed to load database: {e}"))?;
+        config.remember_database()?;
+        self.config = config;
+        self.entry = entries;
+        self.select_first_entry_in_normal_view();
+        self.dragged_entry = None;
+        self.show_dropped = false;
+        self.show_help = false;
+        self.show_full_title = false;
+        self.show_total_episodes_popup = false;
+        self.input.clear();
+        self.cursor_position = 0;
+        self.error = None;
+        self.last_error_time = None;
+        self.input_mode = InputMode::Normal;
+        Ok(())
     }
 
     pub fn add_entry(&mut self, title: String) {

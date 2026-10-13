@@ -48,7 +48,9 @@ Here's an example of a `config.yaml` file:
 storage_path: "~/Desktop/projects/senarai/storage"
 ```
 
-* `storage_path`: Specifies the directory where your `senarai.db` database file will be stored. If not provided, it defaults to the directory where the `senarai` executable is located.
+* `storage_path`: Specifies the directory where your database files are stored. If not provided, it defaults to the directory where the `senarai` executable is located.
+
+Press `c` to list all `.db` files directly inside `storage_path`. Use `↑`/`↓` to select, `Enter` to open, and `Esc` to cancel. The active database is marked in the list. Senarai remembers the last successfully opened database in `.senarai-state.json` inside the storage directory and reopens it at startup. If that database has been removed, it falls back to `senarai.db`.
 
 ## Keybindings
 
@@ -67,6 +69,7 @@ Senarai operates in different modes: **Normal**, **Adding**, and **Editing**.
 | `Shift + →`         | Change status of selected entry to next           |
 | `←`                 | Select the previous column/status                 |
 | `Shift + ←`         | Change status of selected entry to previous       |
+| `c`                 | Choose a database from the storage directory      |
 | `a`                 | Enter **Adding** mode to add a new entry          |
 | `e`                 | Enter **Editing** mode to edit selected entry     |
 | `h`                 | Toggle help display                               |

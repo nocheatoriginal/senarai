@@ -35,6 +35,7 @@ fn create_dummy_app() -> App {
     ];
     let config = Config {
         storage_path: "dummy_path".to_string(),
+        ..Config::default()
     };
     App::new(entries, config)
 }
@@ -120,6 +121,7 @@ fn test_move_to() {
     ];
     let config = Config {
         storage_path: "dummy_path".to_string(),
+        ..Config::default()
     };
     let mut app = App::new(entries, config);
 
@@ -186,4 +188,128 @@ fn test_selected_entry_progress_rules() {
     app.entry[0].status = Status::Watching;
     app.entry[0].watched_episodes = 12;
     assert_eq!(app.selected_entry_progress(), 100);
+}
+
+struct DatabaseDirectory(std::path::PathBuf);
+
+impl DatabaseDirectory {
+    fn new() -> Self {
+        let path = std::env::temp_dir().join(format!("senarai-test-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&path).unwrap();
+        Self(path)
+    }
+
+    fn config(&self) -> Config {
+        Config {
+            storage_path: self.0.to_str().unwrap().to_owned(),
+            ..Config::default()
+        }
+    }
+}
+
+impl Drop for DatabaseDirectory {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+#[test]
+fn database_switch_persists_and_keeps_writes_isolated() {
+    use senarai::database;
+    let directory = DatabaseDirectory::new();
+    let original = directory.config();
+    database::init_db(&original).unwrap();
+    let mut app = App::new(Vec::new(), original.clone());
+    app.add_entry("Original".into());
+    let mut second = original.clone();
+    second.database_file = "other.db".into();
+    database::init_db(&second).unwrap();
+    std::fs::write(directory.0.join("ignore.txt"), "").unwrap();
+    std::fs::create_dir(directory.0.join("directory.db")).unwrap();
+
+    app.open_database_picker().unwrap();
+    assert_eq!(
+        app.database_files,
+        vec![std::path::PathBuf::from("other.db"), "senarai.db".into()]
+    );
+    assert_eq!(app.database_list_state.selected(), Some(1));
+    app.database_list_state.select(Some(0));
+    app.open_selected_database().unwrap();
+    assert!(app.entry.is_empty());
+    assert_eq!(app.selected_index, 0);
+    app.add_entry("Other".into());
+    app.next_episode();
+    assert_eq!(
+        database::load_entry(&original).unwrap()[0].title,
+        "Original"
+    );
+    assert_eq!(database::load_entry(&original).unwrap()[0].episode, 0);
+    assert_eq!(database::load_entry(&second).unwrap()[0].episode, 1);
+
+    let mut restarted = directory.config();
+    restarted.restore_last_database().unwrap();
+    assert_eq!(restarted.database_file, second.database_file);
+    assert_eq!(database::load_entry(&restarted).unwrap()[0].title, "Other");
+    std::fs::remove_file(second.database_path()).unwrap();
+    restarted.restore_last_database().unwrap();
+    assert_eq!(restarted.database_file, original.database_file);
+}
+
+#[test]
+fn failed_database_switch_preserves_current_entries_and_selection() {
+    let directory = DatabaseDirectory::new();
+    let config = directory.config();
+    senarai::database::init_db(&config).unwrap();
+    config.remember_database().unwrap();
+    let mut app = App::new(Vec::new(), config);
+    app.add_entry("Keep me".into());
+    std::fs::write(directory.0.join("broken.db"), "not a SQLite database").unwrap();
+    app.open_database_picker().unwrap();
+    app.database_list_state.select(Some(0));
+    assert!(app.open_selected_database().is_err());
+    assert_eq!(app.entry[0].title, "Keep me");
+    assert_eq!(
+        app.config.database_file,
+        std::path::PathBuf::from("senarai.db")
+    );
+    let mut restarted = directory.config();
+    restarted.restore_last_database().unwrap();
+    assert_eq!(restarted.database_file, app.config.database_file);
+
+    std::fs::remove_file(directory.0.join("broken.db")).unwrap();
+    assert!(app.open_selected_database().is_err());
+    assert!(!directory.0.join("broken.db").exists());
+}
+
+#[test]
+fn picker_renders_empty_and_scrolls_to_selected_database() {
+    use ratatui::{backend::TestBackend, Terminal};
+    let directory = DatabaseDirectory::new();
+    let mut app = App::new(Vec::new(), directory.config());
+    app.open_database_picker().unwrap();
+    assert_eq!(app.database_list_state.selected(), None);
+    app.open_selected_database().unwrap();
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+    terminal
+        .draw(|frame| senarai::ui::draw_ui(frame, &mut app))
+        .unwrap();
+    let content = |terminal: &Terminal<TestBackend>| {
+        terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>()
+    };
+    assert!(content(&terminal).contains("No .db files found."));
+    for index in 0..40 {
+        std::fs::write(directory.0.join(format!("{index:02}.db")), "").unwrap();
+    }
+    app.open_database_picker().unwrap();
+    app.database_list_state.select(Some(39));
+    terminal
+        .draw(|frame| senarai::ui::draw_ui(frame, &mut app))
+        .unwrap();
+    assert!(content(&terminal).contains("> 39.db"));
 }

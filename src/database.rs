@@ -1,11 +1,11 @@
-use crate::{config::Config, consts, Entry, Status};
+use crate::{config::Config, Entry, Status};
 use rusqlite::types::Type;
 use rusqlite::{Connection, Result};
-use std::path::Path;
+use std::path::PathBuf;
 use uuid::Uuid;
 
 pub fn load_entry(config: &Config) -> Result<Vec<Entry>> {
-    let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
+    let db_path = config.database_path();
     let conn = Connection::open(db_path)?;
 
     let mut stmt = conn.prepare(
@@ -35,7 +35,7 @@ pub fn load_entry(config: &Config) -> Result<Vec<Entry>> {
 }
 
 pub fn get_entry_by_title(title: &str, config: &Config) -> Result<Option<Entry>> {
-    let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
+    let db_path = config.database_path();
     let conn = Connection::open(db_path)?;
 
     let mut stmt = conn.prepare(
@@ -65,7 +65,7 @@ pub fn get_entry_by_title(title: &str, config: &Config) -> Result<Option<Entry>>
 }
 
 pub fn add_entry(entry: &Entry, config: &Config) -> Result<()> {
-    let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
+    let db_path = config.database_path();
     let conn = Connection::open(db_path)?;
 
     let max_ordering: i64 = conn.query_row("SELECT MAX(ordering) FROM entries", [], |row| {
@@ -90,7 +90,7 @@ pub fn add_entry(entry: &Entry, config: &Config) -> Result<()> {
 }
 
 pub fn update_all_entries(entries: &[Entry], config: &Config) -> Result<()> {
-    let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
+    let db_path = config.database_path();
     let mut conn = Connection::open(db_path)?;
     let tx = conn.transaction()?;
 
@@ -114,7 +114,7 @@ pub fn update_all_entries(entries: &[Entry], config: &Config) -> Result<()> {
 }
 
 pub fn delete_entry(id: &Uuid, config: &Config) -> Result<()> {
-    let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
+    let db_path = config.database_path();
     let conn = Connection::open(db_path)?;
 
     conn.execute("DELETE FROM entries WHERE id = ?1", [id.to_string()])?;
@@ -185,7 +185,7 @@ fn add_max_episodes_column_if_not_exists(conn: &Connection) -> Result<()> {
 }
 
 pub fn init_db(config: &Config) -> Result<()> {
-    let db_path = Path::new(&config.storage_path).join(consts::DB_FILE_NAME);
+    let db_path = config.database_path();
 
     if let Some(parent_dir) = db_path.parent() {
         if !parent_dir.exists() {
@@ -219,4 +219,18 @@ pub fn init_db(config: &Config) -> Result<()> {
     add_ordering_column_if_not_exists(&conn)?;
 
     Ok(())
+}
+
+/// List database files directly inside the configured storage directory.
+pub fn list_databases(config: &Config) -> std::io::Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    for entry in std::fs::read_dir(&config.storage_path)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_file() && path.extension().is_some_and(|ext| ext == "db") {
+            files.push(PathBuf::from(entry.file_name()));
+        }
+    }
+    files.sort();
+    Ok(files)
 }

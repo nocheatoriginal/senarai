@@ -32,6 +32,7 @@ pub fn handle_input(app: &mut App) -> InputResult {
 
 fn handle_key(key: KeyEvent, app: &mut App) -> InputResult {
     match app.input_mode {
+        InputMode::ChoosingDatabase => handle_database_mode_key(key, app),
         InputMode::Normal => handle_normal_mode_key(key, app),
         InputMode::Adding | InputMode::Editing => handle_input_mode_key(key, app),
         InputMode::MaxEpisodes => handle_max_episodes_input_mode_key(key, app),
@@ -40,6 +41,38 @@ fn handle_key(key: KeyEvent, app: &mut App) -> InputResult {
         InputMode::Dropped => handle_dropped_mode_key(key, app),
         InputMode::TotalEpisodes => handle_total_episodes_mode_key(key, app),
     }
+}
+
+fn handle_database_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
+    match key.code {
+        KeyCode::Esc | KeyCode::Char('c') => {
+            app.input_mode = if app.show_dropped {
+                InputMode::Dropped
+            } else {
+                InputMode::Normal
+            };
+        }
+        KeyCode::Up => {
+            if let Some(index) = app.database_list_state.selected() {
+                app.database_list_state
+                    .select(Some(index.saturating_sub(1)));
+            }
+        }
+        KeyCode::Down => {
+            if let Some(index) = app.database_list_state.selected() {
+                if index + 1 < app.database_files.len() {
+                    app.database_list_state.select(Some(index + 1));
+                }
+            }
+        }
+        KeyCode::Enter => {
+            if let Err(error) = app.open_selected_database() {
+                return InputResult::Error(error);
+            }
+        }
+        _ => {}
+    }
+    InputResult::Success
 }
 
 fn handle_total_episodes_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
@@ -135,6 +168,11 @@ fn handle_max_episodes_input_mode_key(key: KeyEvent, app: &mut App) -> InputResu
 
 fn handle_normal_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
     match key.code {
+        KeyCode::Char('c') => {
+            if let Err(error) = app.open_database_picker() {
+                return InputResult::Error(error);
+            }
+        }
         KeyCode::Char('q') => return InputResult::Quit,
         KeyCode::Up => {
             if key.modifiers == KeyModifiers::SHIFT {
@@ -356,6 +394,12 @@ fn handle_dropped_mode_key(key: KeyEvent, app: &mut App) -> InputResult {
     let dropped_entries = app.get_dropped_entries();
 
     match key.code {
+        KeyCode::Char('c') => {
+            return match app.open_database_picker() {
+                Ok(()) => InputResult::Success,
+                Err(error) => InputResult::Error(error),
+            };
+        }
         KeyCode::Char('q') => return InputResult::Quit,
         KeyCode::Char('h') => {
             app.show_help = !app.show_help;
@@ -443,6 +487,9 @@ fn clamp_cursor(new_cursor_pos: usize, input: &str) -> usize {
 }
 
 fn handle_mouse(mouse: MouseEvent, app: &mut App) -> InputResult {
+    if app.input_mode == InputMode::ChoosingDatabase {
+        return InputResult::Success;
+    }
     app.mouse_pos = (mouse.column, mouse.row);
 
     match mouse.kind {
@@ -530,4 +577,48 @@ fn handle_mouse(mouse: MouseEvent, app: &mut App) -> InputResult {
         _ => {}
     }
     InputResult::Success
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{config::Config, database};
+
+    #[test]
+    fn database_keys_open_navigate_cancel_and_confirm() {
+        let directory = std::env::temp_dir().join(format!("senarai-keys-{}", uuid::Uuid::new_v4()));
+        let config = Config {
+            storage_path: directory.to_str().unwrap().to_owned(),
+            ..Config::default()
+        };
+        database::init_db(&config).unwrap();
+        let mut other = config.clone();
+        other.database_file = "another.db".into();
+        database::init_db(&other).unwrap();
+        let mut app = App::new(Vec::new(), config);
+        let press = |code, app: &mut App| handle_key(KeyEvent::new(code, KeyModifiers::NONE), app);
+        press(KeyCode::Char('c'), &mut app);
+        assert!(app.input_mode == InputMode::ChoosingDatabase);
+        press(KeyCode::Up, &mut app);
+        assert_eq!(app.database_list_state.selected(), Some(0));
+        press(KeyCode::Down, &mut app);
+        assert_eq!(app.database_list_state.selected(), Some(1));
+        press(KeyCode::Up, &mut app);
+        press(KeyCode::Esc, &mut app);
+        assert!(app.input_mode == InputMode::Normal);
+        assert_eq!(
+            app.config.database_file,
+            std::path::PathBuf::from("senarai.db")
+        );
+        press(KeyCode::Char('c'), &mut app);
+        press(KeyCode::Up, &mut app);
+        assert!(press(KeyCode::Enter, &mut app) == InputResult::Success);
+        assert_eq!(app.config.database_file, other.database_file);
+        assert!(app.input_mode == InputMode::Normal);
+        press(KeyCode::Char('a'), &mut app);
+        press(KeyCode::Char('c'), &mut app);
+        assert!(app.input_mode == InputMode::Adding);
+        assert_eq!(app.input, "C");
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 }
